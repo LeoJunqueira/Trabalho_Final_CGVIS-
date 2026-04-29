@@ -52,11 +52,12 @@
 > - Coloque aqui **três imagens** capturadas do vídeo acima, que você
 >   irá usar como ilustração para as explicações que vêm abaixo.
 
-<mark>`<img width="968" height="736" alt="image" src="https://github.com/user-attachments/assets/195b8987-405d-4885-8f99-413e82a34b5e" />
-<img width="969" height="722" alt="image" src="https://github.com/user-attachments/assets/8f4248c2-61b4-44a3-a0ef-727a3ee0d5d1" />
-<img width="966" height="720" alt="image" src="https://github.com/user-attachments/assets/1d3c2f49-a562-4a1c-aadb-e1dd634c86b1" />
+<img width="1283" height="633" alt="image" src="https://github.com/user-attachments/assets/afab1538-a7db-4a1b-ac83-b917cbd98245" />
+<img width="1291" height="636" alt="image" src="https://github.com/user-attachments/assets/f5740ff0-7383-4163-b7f0-6dfcc353b577" />
+<img width="1297" height="701" alt="image" src="https://github.com/user-attachments/assets/fdd90d12-b4d6-4387-bf1f-370933639b8c" />
 
-`</mark>
+
+
 
 ## Especificação textual
 
