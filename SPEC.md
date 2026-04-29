@@ -34,7 +34,7 @@
 >   do próprio repositório. Mas, garanta que qualquer um tenha
 >   permissão de acesso ao vídeo através deste link.
 
-<mark>`https://www.youtube.com/watch?v=N0UHAFoU5i8`</mark>
+<mark>`https://www.youtube.com/watch?v=1OKB8gobKCw`</mark>
 
 ### Vídeo - Timestamp
 
@@ -43,8 +43,8 @@
 >   será a base de comparação para avaliar se o seu trabalho final
 >   conseguiu ou não reproduzir a referência.
 
-- **Timestamp inicial**: <mark>`00:00`</mark>
-- **Timestamp final**: <mark>`00:44`</mark>
+- **Timestamp inicial**: <mark>`25:38`</mark>
+- **Timestamp final**: <mark>`26:26`</mark>
 
 ### Imagens
 
