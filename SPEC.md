@@ -6,15 +6,15 @@
 
 ## Integrantes da dupla
 
-- **Aluno 1 - Nome**: <mark>`<preencher>`</mark>
-- **Aluno 1 - Cartão UFRGS**: <mark>`<preencher>`</mark>
+- **Aluno 1 - Nome**: <mark>`Isasc Ventura`</mark>
+- **Aluno 1 - Cartão UFRGS**: <mark>`00303938`</mark>
 
-- **Aluno 2 - Nome**: <mark>`<preencher>`</mark>
+- **Aluno 2 - Nome**: <mark>`Leonardo Junqueira`</mark>
 - **Aluno 2 - Cartão UFRGS**: <mark>`<preencher>`</mark>
 
 ## Detalhes do que será implementado
 
-- **Título do trabalho**: <mark>`<preencher>`</mark>
+- **Título do trabalho**: <mark>`Chefão Ripper Roo - Crash Bandicoot`</mark>
 - **Parágrafo curto descrevendo o que será implementado**: <mark>`<preencher>`</mark>
 
 ## Especificação visual
