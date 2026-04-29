@@ -15,7 +15,7 @@
 ## Detalhes do que será implementado
 
 - **Título do trabalho**: <mark>`Chefão Ripper Roo - Crash Bandicoot`</mark>
-- **Parágrafo curto descrevendo o que será implementado**: <mark>`<preencher>`</mark>
+- **Parágrafo curto descrevendo o que será implementado**: <mark>`A Fase de um Chefão (Ripper Roo) do Crash Bandicoot 1`</mark>
 
 ## Especificação visual
 
@@ -34,7 +34,7 @@
 >   do próprio repositório. Mas, garanta que qualquer um tenha
 >   permissão de acesso ao vídeo através deste link.
 
-<mark>`<preencher>`</mark>
+<mark>`https://www.youtube.com/watch?v=N0UHAFoU5i8`</mark>
 
 ### Vídeo - Timestamp
 
@@ -43,8 +43,8 @@
 >   será a base de comparação para avaliar se o seu trabalho final
 >   conseguiu ou não reproduzir a referência.
 
-- **Timestamp inicial**: <mark>`<preencher>`</mark>
-- **Timestamp final**: <mark>`<preencher>`</mark>
+- **Timestamp inicial**: <mark>`00:00`</mark>
+- **Timestamp final**: <mark>`00:44`</mark>
 
 ### Imagens
 
@@ -52,7 +52,11 @@
 > - Coloque aqui **três imagens** capturadas do vídeo acima, que você
 >   irá usar como ilustração para as explicações que vêm abaixo.
 
-<mark>`<preencher>`</mark>
+<mark>`<img width="968" height="736" alt="image" src="https://github.com/user-attachments/assets/195b8987-405d-4885-8f99-413e82a34b5e" />
+<img width="969" height="722" alt="image" src="https://github.com/user-attachments/assets/8f4248c2-61b4-44a3-a0ef-727a3ee0d5d1" />
+<img width="966" height="720" alt="image" src="https://github.com/user-attachments/assets/1d3c2f49-a562-4a1c-aadb-e1dd634c86b1" />
+
+`</mark>
 
 ## Especificação textual
 
@@ -65,7 +69,7 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 <mark>`<preencher>`</mark>
 
 ### Diferentes tipos de câmeras
-<mark>`<preencher>`</mark>
+<mark>`3 pessoa, que é a padrão do Crash, e implementaremos a em 1 pessoa`</mark>
 
 ### Instâncias de objetos
 <mark>`<preencher>`</mark>
