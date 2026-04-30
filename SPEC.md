@@ -99,7 +99,7 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 > - Para cada item, **explique por que** não será implementado ou por
 >   que será implementado parcialmente.
 
-- <mark>`Não sabemos se conseguiremos implementar a água como aparece no game`</mark>
+- <mark>`Não sabemos se conseguiremos implementar o efeito da água como aparece no game`</mark>
 - <mark>`A sombra embaixo do player`</mark>
 - <mark>`A chama da Tocha`</mark>
 - <mark>`Espuma da água`</mark>
