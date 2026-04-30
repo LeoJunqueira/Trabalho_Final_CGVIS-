@@ -10,7 +10,7 @@
 - **Aluno 1 - Cartão UFRGS**: <mark>`00303938`</mark>
 
 - **Aluno 2 - Nome**: <mark>`Leonardo Junqueira`</mark>
-- **Aluno 2 - Cartão UFRGS**: <mark>`<preencher>`</mark>
+- **Aluno 2 - Cartão UFRGS**: <mark>`00242318`</mark>
 
 ## Detalhes do que será implementado
 
@@ -64,31 +64,31 @@
 Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final - Moodle](https://moodle.ufrgs.br/mod/assign/view.php?id=6018620)), escreva um parágrafo **curto** explicando como este requisito será atendido, apontando itens específicos do vídeo/imagens que você incluiu acima que atendem estes requisitos.
 
 ### Malhas poligonais complexas
-<mark>`<preencher>`</mark>
+<mark>`Crash (player), Ripper Roo (inimigo), Akuku (mascará que segue o player), talvez algum objeto do cenário`</mark>
 
 ### Transformações geométricas controladas pelo usuário
-<mark>`<preencher>`</mark>
+<mark>`Crash (Player)`</mark>
 
 ### Diferentes tipos de câmeras
-<mark>`3 pessoa, que é a padrão do Crash, e implementaremos a em 1 pessoa`</mark>
+<mark>`Terceira pessoa (padrão do game) e Primeira pessoa`</mark>
 
 ### Instâncias de objetos
-<mark>`<preencher>`</mark>
+<mark>`Plataformas, Pilares de fogo, Colunas e Caixas Explosivas`</mark>
 
 ### Testes de intersecção
-<mark>`<preencher>`</mark>
+<mark>`Plataformas, Água, Caixas explosivas, Chefão (Ripper Roo) e Paredes invisíveis que delimitam o cenário`</mark>
 
 ### Modelos de Iluminação em todos os objetos
-<mark>`<preencher>`</mark>
+<mark>`Fonte de luz Pontual em cada tocha do cenário, juntamente com a "fonte de luz natural"`</mark>
 
 ### Mapeamento de texturas em todos os objetos
-<mark>`<preencher>`</mark>
+<mark>`Cenário, personagens (tanto player, akuku [máscara] e inimigo) e Caixas explosivas`</mark>
 
 ### Movimentação com curva Bézier cúbica
-<mark>`<preencher>`</mark>
+<mark>`O movimento que o Akuku (máscara) faz entorno do player`</mark>
 
 ### Animações baseadas no tempo ($\Delta t$)
-<mark>`<preencher>`</mark>
+<mark>`Caixas explosivas e o Ripper Roo (chefão)`</mark>
 
 ## Limitações esperadas
 
@@ -99,4 +99,10 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 > - Para cada item, **explique por que** não será implementado ou por
 >   que será implementado parcialmente.
 
-<mark>`<preencher>`</mark>
+<mark>`
+Não sabemos se conseguiremos implementar a água como aparece no game
+A sombra embaixo do player
+A chama da Tocha
+Espuma da água
+Distorção visual causada pelo fogo no cenário
+`</mark>
