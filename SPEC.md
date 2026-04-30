@@ -100,9 +100,9 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 >   que será implementado parcialmente.
 
 <mark>`
-Não sabemos se conseguiremos implementar a água como aparece no game
-A sombra embaixo do player
-A chama da Tocha
-Espuma da água
+Não sabemos se conseguiremos implementar a água como aparece no game \n
+A sombra embaixo do player \n
+A chama da Tocha \n
+Espuma da água \n
 Distorção visual causada pelo fogo no cenário
 `</mark>
