@@ -64,7 +64,7 @@
 Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final - Moodle](https://moodle.ufrgs.br/mod/assign/view.php?id=6018620)), escreva um parágrafo **curto** explicando como este requisito será atendido, apontando itens específicos do vídeo/imagens que você incluiu acima que atendem estes requisitos.
 
 ### Malhas poligonais complexas
-<mark>`Crash (player), Ripper Roo (inimigo), Akuku (mascará que segue o player), talvez algum objeto do cenário`</mark>
+<mark>`Crash (player), Ripper Roo (inimigo), Akuaku (máscara que segue o player), talvez algum objeto do cenário`</mark>
 
 ### Transformações geométricas controladas pelo usuário
 <mark>`Crash (Player)`</mark>
@@ -82,10 +82,10 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 <mark>`Fonte de luz Pontual em cada tocha do cenário, juntamente com a "fonte de luz natural"`</mark>
 
 ### Mapeamento de texturas em todos os objetos
-<mark>`Cenário, personagens (tanto player, akuku [máscara] e inimigo) e Caixas explosivas`</mark>
+<mark>`Cenário, personagens (tanto player, akuaku [máscara] e inimigo) e Caixas explosivas`</mark>
 
 ### Movimentação com curva Bézier cúbica
-<mark>`O movimento que o Akuku (máscara) faz entorno do player`</mark>
+<mark>`O movimento que o Akuaku (máscara) faz entorno do player`</mark>
 
 ### Animações baseadas no tempo ($\Delta t$)
 <mark>`Caixas explosivas e o Ripper Roo (chefão)`</mark>
