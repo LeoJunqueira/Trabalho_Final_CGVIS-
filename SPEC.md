@@ -104,3 +104,5 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 - <mark>`A chama da Tocha`</mark>
 - <mark>`Espuma da água`</mark>
 - <mark>`Distorção visual causada pelo fogo no cenário`</mark>
+
+> Comentário Professor: Acho que seria interessante implementar a sombra, ela é bem simples: pode ser implementada como uma geometria (plano) que fica sempre abaixo do jogador.
