@@ -23,6 +23,11 @@ uniform mat4 projection;
 #define BUNNY  1
 #define PLANE  2
 #define CRASH  3
+#define CUBE   4
+#define PILAR  5
+#define PILAR_TOCHA  6
+#define CAIXA_EXPLOSIVA 7
+#define WATER 8
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -35,6 +40,7 @@ uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
 uniform sampler2D TextureImage3;
 uniform sampler2D TextureImage4;
+uniform sampler2D TextureImage5;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -100,7 +106,7 @@ void main()
         V = (phi + M_PI_2) / M_PI;
 
 		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-		Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+		Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
     }
     else if ( object_id == BUNNY )
     {
@@ -147,6 +153,48 @@ void main()
         // Se o Crash foi a terceira textura carregada no main.cpp, use TextureImage2.
         Kd0 = texture(TextureImage2, vec2(U,V)).rgb; 
     }
+    else if ( object_id == CUBE )
+    {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
+        U = texcoords.x;
+        V = texcoords.y;
+
+		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
+		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
+    }
+    else if ( object_id == PILAR )
+    {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
+        U = texcoords.x;
+        V = texcoords.y;
+
+		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
+		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
+    }
+    else if ( object_id == PILAR_TOCHA )
+    {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
+        U = texcoords.x;
+        V = texcoords.y;
+
+		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
+		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
+    }
+    else if ( object_id == CAIXA_EXPLOSIVA )
+    {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
+        U = texcoords.x;
+        V = texcoords.y;
+
+		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
+		Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
+    }
+    else if ( object_id == WATER )
+    {
+        // Uma cor azul-piscina/ciano bem bonita para a água
+        Kd0 = vec3(0.0f, 0.4f, 0.6f); 
+    }
+
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
@@ -165,7 +213,19 @@ void main()
     //    suas distâncias para a câmera (desenhando primeiro objetos
     //    transparentes que estão mais longe da câmera).
     // Alpha default = 1 = 100% opaco = 0% transparente
-    color.a = 1;
+    // Altere o final do seu shader_fragment.glsl para isso:
+    
+    if ( object_id == WATER )
+    {
+        color.a = 0.5; // 50% de transparência. Menor = mais invisível, Maior = mais sólida.
+    }
+    else
+    {
+        color.a = 1.0; // Todos os outros objetos continuam 100% opacos
+    }
+
+    // Cor final com correção gamma (mantenha a linha que já existia)
+    color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas

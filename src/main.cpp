@@ -195,9 +195,17 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.5f; // Distância da câmera para a origem
+float g_CameraTheta = -3.15f; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi = -0.5f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 20.0f; // Distância da câmera para a origem
+
+glm::vec4 g_CameraPosition = glm::vec4(0.0f, 5.0f, 11.0f, 1.0f); // Posição inicial da câmera
+
+// Variáveis para saber quais teclas estão pressionadas
+bool g_W_Pressed = false;
+bool g_A_Pressed = false;
+bool g_S_Pressed = false;
+bool g_D_Pressed = false;
 
 // Variáveis que controlam rotação do antebraço
 float g_ForearmAngleZ = 0.0f;
@@ -254,7 +262,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - Seu Cartao - Seu Nome", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "INF01047 - 00303938 - Isasc Ventura -- 00242318 - Leonardo Junqueira", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -299,11 +307,12 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
+    LoadTextureImage("../../data/red_brick_diff_1k.jpg");       //TextureImage0
     LoadTextureImage("../../data/rocky_terrain_02_diff_1k.jpg"); // TextureImage1
     LoadTextureImage("../../data/color_pallete.png");   // Textura principal do Crash 02
     LoadTextureImage("../../data/shoes.png");   // Textura sapato do Crash 03
     LoadTextureImage("../../data/back.png");   // Textura costas do Crash 04
+    LoadTextureImage("../../data/concreto.png");   // Textura pilares
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -321,6 +330,18 @@ int main(int argc, char* argv[])
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
+
+    ObjModel cubemodel("../../data/cube.obj");
+    ComputeNormals(&cubemodel);
+    BuildTrianglesAndAddToVirtualScene(&cubemodel);
+
+    ObjModel pilarmodel("../../data/pilar.obj");
+    ComputeNormals(&pilarmodel);
+    BuildTrianglesAndAddToVirtualScene(&pilarmodel);
+
+    ObjModel pilar_tochamodel("../../data/pilar_tocha.obj");
+    ComputeNormals(&pilar_tochamodel);
+    BuildTrianglesAndAddToVirtualScene(&pilar_tochamodel);
 
     if ( argc > 1 )
     {
@@ -360,25 +381,38 @@ int main(int argc, char* argv[])
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
 
-        // Computamos a posição da câmera utilizando coordenadas esféricas.  As
-        // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
-        // controladas pelo mouse do usuário. Veja as funções CursorPosCallback()
-        // e ScrollCallback().
-        float r = g_CameraDistance;
-        float y = r*sin(g_CameraPhi);
-        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
-        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+       // =====================================================================
+        // SISTEMA DE CÂMERA LIVRE (ESTILO FPS) - CORRIGIDO
+        // =====================================================================
 
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-        glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+        // 1. Calculamos a direção para onde o mouse está olhando
+        float r = 1.0f;
+        float cam_y = r * sin(g_CameraPhi);
+        float cam_z = r * cos(g_CameraPhi) * cos(g_CameraTheta);
+        float cam_x = r * cos(g_CameraPhi) * sin(g_CameraTheta);
 
-        // Computamos a matriz "View" utilizando os parâmetros da câmera para
-        // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        // Vetor de visão (direção para onde a câmera aponta)
+        glm::vec4 camera_view_vector = glm::vec4(cam_x, cam_y, cam_z, 0.0f); 
+        // Vetor "up" fixado para o teto (eixo Y global)
+        glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
+
+        // 2. Calculamos o vetor para movimentação lateral (perpendicular à visão)
+        glm::vec3 view_3 = glm::vec3(camera_view_vector.x, camera_view_vector.y, camera_view_vector.z);
+        glm::vec3 up_3   = glm::vec3(camera_up_vector.x, camera_up_vector.y, camera_up_vector.z);
+        glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, up_3)), 0.0f);
+
+        // 3. Atualizamos a posição global da câmera pelas teclas W, A, S, D
+        float camera_speed = 0.001f; // Ajuste para ficar mais rápido ou devagar
+
+        if (g_W_Pressed) g_CameraPosition += camera_view_vector * camera_speed;
+        if (g_S_Pressed) g_CameraPosition -= camera_view_vector * camera_speed;
+        if (g_D_Pressed) g_CameraPosition += camera_side_vector * camera_speed;
+        if (g_A_Pressed) g_CameraPosition -= camera_side_vector * camera_speed;
+
+        // 4. Computamos a matriz View ÚNICA que será enviada para a GPU
+        glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_view_vector, camera_up_vector);
+
+        // =====================================================================
 
         // Agora computamos a matriz de Projeção.
         glm::mat4 projection;
@@ -386,7 +420,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f; // Posição do "far plane"
+        float farplane  = -1000.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -417,12 +451,20 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
         glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
-        //#define SPHERE 0
+        #define SPHERE 0
         //#define BUNNY  1
         #define PLANE  2
         #define CRASH  3
+        #define CUBE   4
+        #define PILAR  5
+        #define PILAR_TOCHA 6
+        #define CAIXA_EXPLOSIVA 7
+        #define WATER 8
+        
+        
         /*
-        // Desenhamos o modelo da esfera
+
+// Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f)
               * Matrix_Rotate_Z(0.6f)
               * Matrix_Rotate_X(0.2f)
@@ -430,7 +472,7 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, SPHERE);
         DrawVirtualObject("the_sphere");
-        
+
         // Desenhamos o modelo do coelho
         model = Matrix_Translate(1.0f,0.0f,0.0f)
               * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
@@ -439,17 +481,282 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_bunny");
         */
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-1.1f,0.0f) * Matrix_Scale(10.0f, 1.0f, 10.0f);
+        model = Matrix_Translate(0.0f,-2.1f,0.0f) 
+                            * Matrix_Scale(20.0f, 1.0f, 10.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
+//-----------------------------------------------------------------------------------------------------------------
 
-        // Desenhamos o modelo do Crash
-        model = Matrix_Translate(0.0f, -1.0f, 0.0f) * Matrix_Scale(0.01f, 0.01f, 0.01f);
+        // Desenhamos o plataforma
+
+
+        //PLATAFORMA DO CENTRO
+        model = Matrix_Translate(0.0f, -1.2f, 0.2f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA CIMA
+        model = Matrix_Translate(0.0f, -1.2f, -4.6f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA BAIXO
+        model = Matrix_Translate(0.0f, -1.2f, 5.0f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA ESQUERDA
+        model = Matrix_Translate(-4.8f, -1.2f, 0.2f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA DIREITA
+        model = Matrix_Translate(4.8f, -1.2f, 0.2f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA DIAGONAL ESQUERDA BAIXO
+        model = Matrix_Translate(-4.8f, -1.2f, 5.0f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA DIAGONAL DIREITA BAIXO
+        model = Matrix_Translate(4.8f, -1.2f, 5.0f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA DIAGONAL ESQUERDA CIMA
+        model = Matrix_Translate(-4.8f, -1.2f, -4.6f) *
+                                Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+        //-------------------------PLATAFORMA DIAGONAL DIREITA CIMA
+        model = Matrix_Translate(4.8f, -1.2f, -4.6f) *
+                            Matrix_Scale(1.0f, 0.5f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
+
+//-------------------------------------------------------------------------------------------------------------------
+
+        //MODELO DO CRASH
+        model = Matrix_Translate(0.0f, -0.8f, 0.0f) 
+                        * Matrix_Scale(0.01f, 0.01f, 0.01f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, CRASH);
         DrawVirtualObject("crash");  // Nome do arquivo .OBJ
 
+//-------------------------------------------------------------------------------------------------------------------
+
+        //-------------------------PILARES A DIREITA DO CENARIO
+        model = Matrix_Translate(10.0f, 5.8f, 0.2f) 
+                        * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                            * Matrix_Scale(0.04f, 0.04f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("pilar");
+
+                    model = Matrix_Translate(10.0f, 5.8f, 5.0f) 
+                                    * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                                        * Matrix_Scale(0.04f, 0.04f, 0.1f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR);
+                    DrawVirtualObject("pilar");
+
+                                model = Matrix_Translate(10.0f, 5.8f, -4.6f) 
+                                                * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                                                    * Matrix_Scale(0.04f, 0.04f, 0.1f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, PILAR);
+                                DrawVirtualObject("pilar");
+
+        //-------------------------PILARES A ESQUERDA DO CENARIO
+        model = Matrix_Translate(-10.0f, 5.8f, 0.2f) 
+                        * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                            * Matrix_Scale(0.04f, 0.04f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("pilar");
+
+                    model = Matrix_Translate(-10.0f, 5.8f, 5.0f) 
+                                    * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                                        * Matrix_Scale(0.04f, 0.04f, 0.1f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR);
+                    DrawVirtualObject("pilar");
+
+                                model = Matrix_Translate(-10.0f, 5.8f, -4.6f) 
+                                                * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                                                    * Matrix_Scale(0.04f, 0.04f, 0.1f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, PILAR);
+                                DrawVirtualObject("pilar");
+
+//-------------------------------------------------------------------------------------------------------------------
+
+        //-------------------------PAREDE CACHOEIRA DIREITA
+        model = Matrix_Translate(7.5f, 5.8f, -7.6f) 
+                        * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus o mantendon de pé
+                            * Matrix_Scale(0.06f, 0.04f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("pilar");
+
+                    model = Matrix_Translate(9.5f, 5.8f, -8.6f) 
+                                * Matrix_Rotate_Y(0.8f)
+                                    * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus o mantendon de pé
+                                        * Matrix_Scale(0.06f, 0.04f, 0.1f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR);
+                    DrawVirtualObject("pilar");
+
+
+        //-------------------------PAREDE CACHOEIRA ESQUERDA
+        model = Matrix_Translate(-7.5f, 5.8f, -7.6f) 
+                        * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                            * Matrix_Scale(0.06f, 0.04f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("pilar");
+
+                    model = Matrix_Translate(-9.5f, 5.8f, -8.6f) 
+                                * Matrix_Rotate_Y(-0.8f)
+                                    * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus o mantendon de pé
+                                        * Matrix_Scale(0.06f, 0.04f, 0.1f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR);
+                    DrawVirtualObject("pilar");
+
+//-------------------------------------------------------------------------------------------------------------------
+
+        //PILARES TOCHAS DIRETA
+        model = Matrix_Translate(7.5f, -1.2f, 0.2f) 
+                            * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+        DrawVirtualObject("the_pilar_tocha");
+        // "FOGO"
+        model = Matrix_Translate(7.5f, 1.0f, 0.2f)
+                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, SPHERE);
+        DrawVirtualObject("the_sphere");
+
+
+                    model = Matrix_Translate(7.5f, -1.2f, 5.0f) 
+                                        * Matrix_Scale(1.0f, 1.0f, 1.0f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+                    DrawVirtualObject("the_pilar_tocha");
+                    // "FOGO"
+                    model = Matrix_Translate(7.5f, 1.0f, 5.0f)
+                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, SPHERE);
+                    DrawVirtualObject("the_sphere");
+                                
+                                model = Matrix_Translate(7.5f, -1.2f, -4.6f) 
+                                                * Matrix_Scale(1.0f, 1.0f, 1.0f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+                                DrawVirtualObject("the_pilar_tocha");
+                                // "FOGO"
+                                model = Matrix_Translate(7.5f, 1.0f, -4.6f)
+                                                * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, SPHERE);
+                                DrawVirtualObject("the_sphere");
+
+        //PILARES TOCHAS ESQUERDA
+        model = Matrix_Translate(-7.5f, -1.2f, 0.2f) 
+                            * Matrix_Scale(1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+        DrawVirtualObject("the_pilar_tocha");
+        // "FOGO"
+        model = Matrix_Translate(-7.5f, 1.0f, 0.2f)
+                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, SPHERE);
+        DrawVirtualObject("the_sphere");
+
+
+                    model = Matrix_Translate(-7.5f, -1.2f, 5.0f) 
+                                        * Matrix_Scale(1.0f, 1.0f, 1.0f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+                    DrawVirtualObject("the_pilar_tocha");
+                    // "FOGO"
+                    model = Matrix_Translate(-7.5f, 1.0f, 5.0f)
+                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, SPHERE);
+                    DrawVirtualObject("the_sphere");
+
+                                model = Matrix_Translate(-7.5f, -1.2f, -4.6f) 
+                                                * Matrix_Scale(1.0f, 1.0f, 1.0f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, PILAR_TOCHA);
+                                DrawVirtualObject("the_pilar_tocha");
+                                // "FOGO"
+                                model = Matrix_Translate(-7.5f, 1.0f, -4.6f)
+                                                * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                                glUniform1i(g_object_id_uniform, SPHERE);
+                                DrawVirtualObject("the_sphere");
+
+//-------------------------------------------------------------------------------------------------------------------
+
+        //CAIXA EXPLOSIVA   
+        model = Matrix_Translate(-2.4f, -1.0f, 0.0f) *
+                            Matrix_Scale(0.7f, 0.7f, 0.7f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CAIXA_EXPLOSIVA);
+        DrawVirtualObject("the_cube");
+
+
+// ----------------------------------------------------------------------------------
+        //  ÁGUA (DEVE SER O ÚLTIMO OBJETO A SER DESENHADO!)
+        // --------------------------------------------------------------------------
+        // 1. Habilitamos a mistura de cores (transparência)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Ajuste a escala para cobrir o tamanho do seu cenário
+        model = Matrix_Translate(0.0f, -1.8f, 0.0f) 
+            * Matrix_Scale(6.6f, 1.0f, 11.0f); 
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, WATER);
+        DrawVirtualObject("the_plane"); 
+
+        //=========================CACHOEIRA=================================
+        model = Matrix_Translate(0.0f, -1.8f, -8.0f) 
+                * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus para ficar na horizontal
+                    * Matrix_Scale(6.6f, 1.0f, 11.0f); 
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, WATER);
+        DrawVirtualObject("the_plane"); 
+
+        // 3. Desabilitamos o blending para não afetar o texto da tela ou outros frames
+        glDisable(GL_BLEND);
+// ----------------------------------------------------------------------------------
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
         TextRendering_ShowEulerAngles(window);
@@ -460,6 +767,10 @@ int main(int argc, char* argv[])
         // Imprimimos na tela informação sobre o número de quadros renderizados
         // por segundo (frames per second).
         TextRendering_ShowFramesPerSecond(window);
+
+
+        // Adicione esta linha para printar a posição da câmera e as matrizes na tela:
+        //TextRendering_ShowModelViewProjection(window, projection, view, model, g_CameraPosition);
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -613,9 +924,14 @@ void LoadShadersFromFiles()
 
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(g_GpuProgramID);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
-    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
+
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0); // Red brick
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1); // Rocky terrain
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2); // Color palette (Crash)
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); // Shoes
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4); // Back
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5); // Concreto (Pilar)
+
     glUseProgram(0);
 }
 
@@ -1133,69 +1449,46 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 // cima da janela OpenGL.
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    // Abaixo executamos o seguinte: caso o botão esquerdo do mouse esteja
-    // pressionado, computamos quanto que o mouse se movimento desde o último
-    // instante de tempo, e usamos esta movimentação para atualizar os
-    // parâmetros que definem a posição da câmera dentro da cena virtual.
-    // Assim, temos que o usuário consegue controlar a câmera.
+    // Computamos o deslocamento do mouse desde o último frame
+    float dx = xpos - g_LastCursorPosX;
+    float dy = ypos - g_LastCursorPosY;
+
+    // DEFINIÇÃO DE SENSIBILIDADE: Altere aqui para ajustar a velocidade global
+    // O valor original era 0.01f (muito rápido). Mudamos para 0.002f.
+    float sensibilidade = 0.002f;
 
     if (g_LeftMouseButtonPressed)
     {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+        // Atualizamos parâmetros da câmera com os deslocamentos atenuados
+        g_CameraTheta -= sensibilidade * dx;
+        g_CameraPhi   += sensibilidade * dy;
     
-        // Atualizamos parâmetros da câmera com os deslocamentos
-        g_CameraTheta -= 0.01f*dx;
-        g_CameraPhi   += 0.01f*dy;
-    
-        // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
-        float phimax = 3.141592f/2;
+        // Trava para a câmera não dar uma cambalhota (manter entre -pi/2 e +pi/2)
+        float phimax = 3.141592f / 2.0f;
         float phimin = -phimax;
     
-        if (g_CameraPhi > phimax)
-            g_CameraPhi = phimax;
-    
-        if (g_CameraPhi < phimin)
-            g_CameraPhi = phimin;
-    
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
+        if (g_CameraPhi > phimax) g_CameraPhi = phimax;
+        if (g_CameraPhi < phimin) g_CameraPhi = phimin;
     }
 
     if (g_RightMouseButtonPressed)
     {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
-    
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_ForearmAngleZ -= 0.01f*dx;
-        g_ForearmAngleX += 0.01f*dy;
-    
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
+        // Atualizamos parâmetros do antebraço
+        g_ForearmAngleZ -= sensibilidade * dx;
+        g_ForearmAngleX += sensibilidade * dy;
     }
 
     if (g_MiddleMouseButtonPressed)
     {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
-    
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_TorsoPositionX += 0.01f*dx;
-        g_TorsoPositionY -= 0.01f*dy;
-    
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
+        // Atualizamos parâmetros do torso
+        g_TorsoPositionX += sensibilidade * dx;
+        g_TorsoPositionY -= sensibilidade * dy;
     }
+
+    // ATENÇÃO: Atualizamos a última posição conhecida SEMPRE no final da função.
+    // Isso evita o bug da câmera "pular" quando você clica após arrastar o mouse solto.
+    g_LastCursorPosX = xpos;
+    g_LastCursorPosY = ypos;
 }
 
 // Função callback chamada sempre que o usuário movimenta a "rodinha" do mouse.
@@ -1226,6 +1519,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // laboratórios. Deve ser sempre o primeiro comando desta função KeyCallback().
     Correcao_KeyCallback(key, action, mod);
     // =======================
+
+// Detecta se a tecla foi pressionada (PRESS) ou solta (RELEASE)
+    bool isPressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
+    if (action == GLFW_RELEASE) isPressed = false;
+
+    if (key == GLFW_KEY_W) g_W_Pressed = isPressed;
+    if (key == GLFW_KEY_S) g_S_Pressed = isPressed;
+    if (key == GLFW_KEY_A) g_A_Pressed = isPressed;
+    if (key == GLFW_KEY_D) g_D_Pressed = isPressed;
+
+
 
     // Se o usuário pressionar a tecla ESC, fechamos a janela.
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
