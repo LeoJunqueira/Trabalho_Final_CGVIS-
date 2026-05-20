@@ -312,7 +312,13 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/color_pallete.png");   // Textura principal do Crash 02
     LoadTextureImage("../../data/shoes.png");   // Textura sapato do Crash 03
     LoadTextureImage("../../data/back.png");   // Textura costas do Crash 04
-    LoadTextureImage("../../data/concreto.png");   // Textura pilares
+    LoadTextureImage("../../data/concreto.png");   // Textura pilares 05
+    LoadTextureImage("../../data/Colores_diffuse.png");   // Textura corpo Ripper Roo 06
+    LoadTextureImage("../../data/TexOjos_diffuse.png");   // Textura olhos Ripper Roo 07
+    LoadTextureImage("../../data/lambert1_baseColor.png");   // Textura principal aku 08
+    LoadTextureImage("../../data/lambert1_emissive.png");   // Textura Aku emissive 09
+    LoadTextureImage("../../data/lambert1_metallicRoughness.png");   // Textura Aku metallic 10
+    LoadTextureImage("../../data/lambert1_normal.png");   // Textura Aku normal 11
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -326,6 +332,14 @@ int main(int argc, char* argv[])
     ObjModel crashModel("../../data/crashbandicoot.obj");
     ComputeNormals(&crashModel);
     BuildTrianglesAndAddToVirtualScene(&crashModel);
+
+    ObjModel ripperoomodel("../../data/Ripper-Roo.obj");
+    ComputeNormals(&ripperoomodel);
+    BuildTrianglesAndAddToVirtualScene(&ripperoomodel);
+
+    ObjModel akuakumodel("../../data/Aku-aku.obj");
+    ComputeNormals(&akuakumodel);
+    BuildTrianglesAndAddToVirtualScene(&akuakumodel);
 
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
@@ -460,11 +474,15 @@ int main(int argc, char* argv[])
         #define PILAR_TOCHA 6
         #define CAIXA_EXPLOSIVA 7
         #define WATER 8
+        #define RIPPER_ROO_BODY 9
+        #define RIPPER_ROO_EYES 10
+        #define AKU_AKU 11
+
         
         
         /*
 
-// Desenhamos o modelo da esfera
+        // Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f)
               * Matrix_Rotate_Z(0.6f)
               * Matrix_Rotate_X(0.2f)
@@ -480,6 +498,7 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, BUNNY);
         DrawVirtualObject("the_bunny");
         */
+
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-2.1f,0.0f) 
                             * Matrix_Scale(20.0f, 1.0f, 10.0f);
@@ -562,6 +581,9 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, CRASH);
         DrawVirtualObject("crash");  // Nome do arquivo .OBJ
+
+
+        
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -730,6 +752,28 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, CAIXA_EXPLOSIVA);
         DrawVirtualObject("the_cube");
+// ----------------------------------------------------------------------------------
+
+
+        //MODELO DO RIPPER ROO
+        model = Matrix_Translate(-2.0f, -0.8f, 0.5f) * Matrix_Scale(0.09f, 0.09f, 0.09f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+
+        // Corpo do Ripper Roo
+        glUniform1i(g_object_id_uniform, RIPPER_ROO_BODY);
+        DrawVirtualObject("RipperRoo_Colores_0"); 
+
+        // Olhos do Ripper Roo (reaproveitando a matriz model acima)
+        glUniform1i(g_object_id_uniform, RIPPER_ROO_EYES);
+        DrawVirtualObject("RipperRoo_TexOjos_0");
+
+
+        //MODELO DO AKU AKU
+        model = Matrix_Translate(2.0f, 0.5f, 0.0f) * Matrix_Scale(5.0f, 5.0f, 5.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+
+        glUniform1i(g_object_id_uniform, AKU_AKU);
+        DrawVirtualObject("pasted__pCylinder7_lambert1_0");
 
 
 // ----------------------------------------------------------------------------------
@@ -931,7 +975,13 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3); // Shoes
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4); // Back
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5); // Concreto (Pilar)
-
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6); // Corpo Ripper Roo
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7); // Olhos Ripper Roo
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8); // principal Aku
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 9); // Aku emissive
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 10); // Aku metallic
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 11); // Aku normal
+    
     glUseProgram(0);
 }
 
