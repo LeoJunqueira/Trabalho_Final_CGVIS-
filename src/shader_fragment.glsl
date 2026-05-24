@@ -28,6 +28,9 @@ uniform mat4 projection;
 #define PILAR_TOCHA  6
 #define CAIXA_EXPLOSIVA 7
 #define WATER 8
+#define RIPPER_ROO_BODY 9
+#define RIPPER_ROO_EYES 10
+#define AKU_AKU 11
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -41,6 +44,12 @@ uniform sampler2D TextureImage2;
 uniform sampler2D TextureImage3;
 uniform sampler2D TextureImage4;
 uniform sampler2D TextureImage5;
+uniform sampler2D TextureImage6;
+uniform sampler2D TextureImage7;
+uniform sampler2D TextureImage8;
+uniform sampler2D TextureImage9;
+uniform sampler2D TextureImage10;
+uniform sampler2D TextureImage11;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -79,6 +88,10 @@ void main()
 
 	// Coeficiente de refletância difusa
 	vec3 Kd0;
+    vec3 Ka;
+    vec3 Kd;
+    vec3 Ks;
+    float q;
 
     if ( object_id == SPHERE )
     {
@@ -193,6 +206,60 @@ void main()
     {
         // Uma cor azul-piscina/ciano bem bonita para a água
         Kd0 = vec3(0.0f, 0.4f, 0.6f); 
+    }
+        // Corpo do Ripper Roo
+    else if ( object_id == 6 ) // RIPPER_ROO_BODY
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        // Use a variável correspondente ao arquivo "Colores_diffuse.png"
+        Kd0 = texture(TextureImage6, vec2(U,V)).rgb; 
+
+        Ka = vec3(1.0, 1.0, 1.0); // Força a luz ambiente no MÁXIMO (vai revelar a cor real)
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.0, 0.0, 0.0); // Zera completamente o brilho especular (tira o efeito de óleo)
+        q = 1.0;
+
+/*
+        // Propriedades de reflectância do material
+        Ka = vec3(0.2, 0.2, 0.2); // Luz ambiente (impede de ficar 100% nas sombras)
+        Kd = vec3(1.0, 1.0, 1.0); // Luz difusa (permite ver a textura com a cor real)
+        Ks = vec3(0.1, 0.1, 0.1); // Brilho especular (fraco, pois não é de metal)
+        q = 10.0;                 // Tamanho do brilho
+ */
+    }
+    // Olhos do Ripper Roo
+    else if ( object_id == 7 ) // RIPPER_ROO_EYES
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        // Use a variável correspondente ao arquivo "TexOjos_diffuse.png"
+        Kd0 = texture(TextureImage7, vec2(U,V)).rgb; 
+
+        Ka = vec3(1.0, 1.0, 1.0); // Força a luz ambiente no MÁXIMO (vai revelar a cor real)
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.0, 0.0, 0.0); // Zera completamente o brilho especular (tira o efeito de óleo)
+        q = 1.0;
+
+/*
+        Ka = vec3(0.2, 0.2, 0.2);
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.8, 0.8, 0.8); // Olhos geralmente brilham mais (mais reflexivos)
+        q = 30.0;
+*/
+    }
+    // Máscara Aku Aku
+    else if ( object_id == 8 ) // AKU_AKU
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        // Use a variável correspondente ao arquivo "lambert1_baseColor.png"
+        Kd0 = texture(TextureImage8, vec2(U,V)).rgb;
+
+        Ka = vec3(0.2, 0.2, 0.2);
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.1, 0.1, 0.1); // Madeira tem pouco brilho
+        q = 10.0;
     }
 
 
