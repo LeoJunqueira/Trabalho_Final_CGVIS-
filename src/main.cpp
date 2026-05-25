@@ -221,6 +221,14 @@ bool g_UsePerspectiveProjection = true;
 // Variável que controla se o texto informativo será mostrado na tela.
 bool g_ShowInfoText = true;
 
+// ==========================================
+// VARIÁVEIS GLOBAIS DE POSIÇÃO DO CRASH
+// ==========================================
+glm::vec4 crash_position = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // Posição inicial (pé no chão)
+float crash_speed = 5.0f; // Velocidade de movimento (unidades por segundo)
+float last_time = 0.0f;   // Para calcular o tempo Delta (Dt)
+//===========================================
+
 // Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
 GLuint g_GpuProgramID = 0;
 GLint g_model_uniform;
@@ -395,37 +403,63 @@ int main(int argc, char* argv[])
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
 
-       // =====================================================================
-        // SISTEMA DE CÂMERA LIVRE (ESTILO FPS) - CORRIGIDO
-        // =====================================================================
+        // ------------------------------------------
+        // CÁLCULO DO DELTA TIME (Dt)
+        // ------------------------------------------
+        float current_time = (float)glfwGetTime();
+        float delta_t = current_time - last_time;
+        last_time = current_time;
 
-        // 1. Calculamos a direção para onde o mouse está olhando
+        // =====================================================================
+        // 1 e 2. SISTEMA DE CÂMERA LIVRE (VEM PRIMEIRO!)
+        // =====================================================================
+        // Calculamos a direção para onde o mouse está olhando
         float r = 1.0f;
         float cam_y = r * sin(g_CameraPhi);
         float cam_z = r * cos(g_CameraPhi) * cos(g_CameraTheta);
         float cam_x = r * cos(g_CameraPhi) * sin(g_CameraTheta);
 
-        // Vetor de visão (direção para onde a câmera aponta)
+        // Vetor de visão e Vetor Up
         glm::vec4 camera_view_vector = glm::vec4(cam_x, cam_y, cam_z, 0.0f); 
-        // Vetor "up" fixado para o teto (eixo Y global)
         glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
 
-        // 2. Calculamos o vetor para movimentação lateral (perpendicular à visão)
+        // Calculamos o vetor lateral para poder andar de lado (Strafe)
         glm::vec3 view_3 = glm::vec3(camera_view_vector.x, camera_view_vector.y, camera_view_vector.z);
         glm::vec3 up_3   = glm::vec3(camera_up_vector.x, camera_up_vector.y, camera_up_vector.z);
         glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, up_3)), 0.0f);
 
-        // 3. Atualizamos a posição global da câmera pelas teclas W, A, S, D
-        float camera_speed = 0.001f; // Ajuste para ficar mais rápido ou devagar
 
-        if (g_W_Pressed) g_CameraPosition += camera_view_vector * camera_speed;
-        if (g_S_Pressed) g_CameraPosition -= camera_view_vector * camera_speed;
-        if (g_D_Pressed) g_CameraPosition += camera_side_vector * camera_speed;
-        if (g_A_Pressed) g_CameraPosition -= camera_side_vector * camera_speed;
+        // =====================================================================
+        // 3. MOVIMENTAÇÃO DA CÂMERA (AGORA NAS SETAS)
+        // =====================================================================
+        // Como estamos multiplicando por delta_t (que é pequeno), a velocidade base precisa ser maior (ex: 5.0f)
+        float camera_speed = 5.0f; 
 
-        // 4. Computamos a matriz View ÚNICA que será enviada para a GPU
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)    g_CameraPosition += camera_view_vector * camera_speed * delta_t;
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)  g_CameraPosition -= camera_view_vector * camera_speed * delta_t;
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) g_CameraPosition += camera_side_vector * camera_speed * delta_t;
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)  g_CameraPosition -= camera_side_vector * camera_speed * delta_t;
+
+
+        // =====================================================================
+        // 3.5. MOVIMENTAÇÃO DO CRASH (WASD)
+        // =====================================================================
+        float crash_speed = 5.0f; 
+
+        // Eixo Z absoluto (Frente e Trás)
+        if (g_W_Pressed) crash_position.z -= crash_speed * delta_t;
+        if (g_S_Pressed) crash_position.z += crash_speed * delta_t;
+
+        // Eixo X absoluto (Esquerda e Direita)
+        if (g_D_Pressed) crash_position.x += crash_speed * delta_t;
+        if (g_A_Pressed) crash_position.x -= crash_speed * delta_t;
+
+
+        // =====================================================================
+        // 4. COMPUTAMOS A MATRIZ VIEW
+        // =====================================================================
         glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_view_vector, camera_up_vector);
-
+    
         // =====================================================================
 
         // Agora computamos a matriz de Projeção.
@@ -576,15 +610,24 @@ int main(int argc, char* argv[])
 //-------------------------------------------------------------------------------------------------------------------
 
         //MODELO DO CRASH
-        model = Matrix_Translate(0.0f, -0.8f, 0.0f) 
+        // Translação usa as variáveis globais que estão sendo alteradas pelo teclado
+        model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z)
                         * Matrix_Scale(0.01f, 0.01f, 0.01f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        
+        // Corpo
         glUniform1i(g_object_id_uniform, CRASH);
         DrawVirtualObject("crash");  // Nome do arquivo .OBJ
+/*
+        // Necessário alterar o Crash no Blender para separar os objetos.
+        // Sapatos
+        glUniform1i(g_object_id_uniform, CRASH_SHOES);
+        DrawVirtualObject("NOME_DOS_SAPATOS_AQUI");
 
-
-        
-
+        // Costas
+        glUniform1i(g_object_id_uniform, CRASH_BACK);
+        DrawVirtualObject("NOME_DAS_COSTAS_AQUI");
+*/        
 //-------------------------------------------------------------------------------------------------------------------
 
         //-------------------------PILARES A DIREITA DO CENARIO
@@ -1515,7 +1558,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     if (g_LeftMouseButtonPressed)
     {
         // Atualizamos parâmetros da câmera com os deslocamentos atenuados
-        g_CameraTheta -= sensibilidade * dx;
+        g_CameraTheta += sensibilidade * dx;
         g_CameraPhi   += sensibilidade * dy;
     
         // Trava para a câmera não dar uma cambalhota (manter entre -pi/2 e +pi/2)
