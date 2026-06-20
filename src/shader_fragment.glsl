@@ -1,9 +1,6 @@
 #version 330 core
 
 // Atributos de fragmentos recebidos como entrada ("in") pelo Fragment Shader.
-// Neste exemplo, este atributo foi gerado pelo rasterizador como a
-// interpolação da posição global e a normal de cada vértice, definidas em
-// "shader_vertex.glsl" e "main.cpp".
 in vec4 position_world;
 in vec4 normal;
 
@@ -13,6 +10,17 @@ in vec4 position_model;
 // Coordenadas de textura obtidas do arquivo OBJ (se existirem!)
 in vec2 texcoords;
 
+// Vetores que calculamos no Vertex Shader
+in vec4 v_ToLightTorch1;
+in vec4 v_ToLightTorch2;
+in vec4 v_ToLightTorch3;
+in vec4 v_ToLightTorch4;
+in vec4 v_ToLightTorch5;
+in vec4 v_ToLightTorch6; 
+
+// Cor da luz emitida pela tocha (laranja/amarelo) vinda do C++
+uniform vec3 u_TorchColor;
+
 // Matrizes computadas no código C++ e enviadas para a GPU
 uniform mat4 model;
 uniform mat4 view;
@@ -20,11 +28,11 @@ uniform mat4 projection;
 
 // Identificador que define qual objeto está sendo desenhado no momento
 #define SPHERE 0
-#define BUNNY  1
-#define PLANE  2
-#define CRASH  3
-#define CUBE   4
-#define PILAR  5
+#define BUNNY   1
+#define PLANE   2
+#define CRASH   3
+#define CUBE    4
+#define PILAR   5
 #define PILAR_TOCHA  6
 #define CAIXA_EXPLOSIVA 7
 #define WATER 8
@@ -65,15 +73,9 @@ void main()
     vec4 origin = vec4(0.0, 0.0, 0.0, 1.0);
     vec4 camera_position = inverse(view) * origin;
 
-    // O fragmento atual é coberto por um ponto que percente à superfície de um
-    // dos objetos virtuais da cena. Este ponto, p, possui uma posição no
-    // sistema de coordenadas global (World coordinates). Esta posição é obtida
-    // através da interpolação, feita pelo rasterizador, da posição de cada
-    // vértice.
     vec4 p = position_world;
 
-    // Normal do fragmento atual, interpolada pelo rasterizador a partir das
-    // normais de cada vértice.
+    // Normal do fragmento atual, interpolada pelo rasterizador a partir das normais de cada vértice.
     vec4 n = normalize(normal);
 
     // Vetor que define o sentido da fonte de luz em relação ao ponto atual.
@@ -86,28 +88,21 @@ void main()
     float U = 0.0;
     float V = 0.0;
 
-	// Coeficiente de refletância difusa
-	vec3 Kd0;
-    vec3 Ka;
-    vec3 Kd;
-    vec3 Ks;
-    float q;
+    // Coeficiente de refletância difusa e propriedades de materiais
+    vec3 Kd0 = vec3(1.0, 1.0, 1.0);
+    vec3 Ka = vec3(0.2, 0.2, 0.2);
+    vec3 Kd = vec3(1.0, 1.0, 1.0);
+    vec3 Ks = vec3(0.0, 0.0, 0.0);
+    float q = 1.0;
+    
+    // Alpha default = 100% opaco
+    float alpha_output = 1.0;
 
+    // -------------------------------------------------------------------------
+    // DEFINIÇÃO DE CORES, TEXTURAS E PROPRIEDADES DE MATERIAL
+    // -------------------------------------------------------------------------
     if ( object_id == SPHERE )
     {
-        // PREENCHA AQUI as coordenadas de textura da esfera, computadas com
-        // projeção esférica EM COORDENADAS DO MODELO. Utilize como referência
-        // o slides 134-150 do documento Aula_20_Mapeamento_de_Texturas.pdf.
-        // A esfera que define a projeção deve estar centrada na posição
-        // "bbox_center" definida abaixo.
-
-        // Você deve utilizar:
-        //   função 'length( )' : comprimento Euclidiano de um vetor
-        //   função 'atan( , )' : arcotangente. Veja https://en.wikipedia.org/wiki/Atan2.
-        //   função 'asin( )'   : seno inverso.
-        //   constante M_PI
-        //   variável position_model
-
         vec4 bbox_center = (bbox_min + bbox_max) / 2.0;
         vec4 d = position_model - bbox_center;
 
@@ -118,184 +113,191 @@ void main()
         U = (theta + M_PI) / 2.0 / M_PI;
         V = (phi + M_PI_2) / M_PI;
 
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-		Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
+        // Propriedades do Vidro Fosco:
+        alpha_output = 0.7; 
+        Kd0 = vec3(0.9, 0.4, 0.1); 
+        q = 8.0; 
+        Ks = vec3(1.0, 0.6, 0.2); 
     }
     else if ( object_id == BUNNY )
     {
-        // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
-        // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
-        // o slides 99-104 do documento Aula_20_Mapeamento_de_Texturas.pdf,
-        // e também use as variáveis min*/max* definidas abaixo para normalizar
-        // as coordenadas de textura U e V dentro do intervalo [0,1]. Para
-        // tanto, veja por exemplo o mapeamento da variável 'p_v' utilizando
-        // 'h' no slides 158-160 do documento Aula_20_Mapeamento_de_Texturas.pdf.
-        // Veja também a Questão 4 do Questionário 4 no Moodle.
-
         float minx = bbox_min.x;
         float maxx = bbox_max.x;
-
         float miny = bbox_min.y;
         float maxy = bbox_max.y;
-
-        float minz = bbox_min.z;
-        float maxz = bbox_max.z;
 
         U = (position_model.x - minx) / (maxx - minx);
         V = (position_model.y - miny) / (maxy - miny);
 
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-		Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
     }
     else if ( object_id == PLANE )
     {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
         U = texcoords.x;
         V = texcoords.y;
-
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
-		Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
     }
     else if ( object_id == CRASH )
     {
-        // Coordenadas de textura do Crash, obtidas diretamente do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
-
-        // Use a unidade de textura correspondente ao PNG que você carregou no LoadTextureImage
-        // Se o Crash foi a terceira textura carregada no main.cpp, use TextureImage2.
         Kd0 = texture(TextureImage2, vec2(U,V)).rgb; 
     }
-    else if ( object_id == CUBE )
+    else if ( object_id == CUBE || object_id == PILAR || object_id == PILAR_TOCHA )
     {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
         U = texcoords.x;
         V = texcoords.y;
-
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
-		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
-    }
-    else if ( object_id == PILAR )
-    {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
-        U = texcoords.x;
-        V = texcoords.y;
-
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
-		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
-    }
-    else if ( object_id == PILAR_TOCHA )
-    {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
-        U = texcoords.x;
-        V = texcoords.y;
-
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
-		Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
     }
     else if ( object_id == CAIXA_EXPLOSIVA )
     {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
         U = texcoords.x;
         V = texcoords.y;
-
-		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage5
-		Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
     }
     else if ( object_id == WATER )
     {
-        // Uma cor azul-piscina/ciano bem bonita para a água
         Kd0 = vec3(0.0f, 0.4f, 0.6f); 
+        alpha_output = 0.5;
     }
-        // Corpo do Ripper Roo
-    else if ( object_id == 6 ) // RIPPER_ROO_BODY
+    else if ( object_id == RIPPER_ROO_BODY || object_id == 6 ) 
     {
         U = texcoords.x;
         V = texcoords.y;
-        // Use a variável correspondente ao arquivo "Colores_diffuse.png"
         Kd0 = texture(TextureImage6, vec2(U,V)).rgb; 
-
-        Ka = vec3(1.0, 1.0, 1.0); // Força a luz ambiente no MÁXIMO (vai revelar a cor real)
+        Ka = vec3(1.0, 1.0, 1.0); 
         Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.0, 0.0, 0.0); // Zera completamente o brilho especular (tira o efeito de óleo)
+        Ks = vec3(0.0, 0.0, 0.0); 
         q = 1.0;
-
-/*
-        // Propriedades de reflectância do material
-        Ka = vec3(0.2, 0.2, 0.2); // Luz ambiente (impede de ficar 100% nas sombras)
-        Kd = vec3(1.0, 1.0, 1.0); // Luz difusa (permite ver a textura com a cor real)
-        Ks = vec3(0.1, 0.1, 0.1); // Brilho especular (fraco, pois não é de metal)
-        q = 10.0;                 // Tamanho do brilho
- */
     }
-    // Olhos do Ripper Roo
-    else if ( object_id == 7 ) // RIPPER_ROO_EYES
+    else if ( object_id == RIPPER_ROO_EYES || object_id == 7 ) 
     {
         U = texcoords.x;
         V = texcoords.y;
-        // Use a variável correspondente ao arquivo "TexOjos_diffuse.png"
         Kd0 = texture(TextureImage7, vec2(U,V)).rgb; 
-
-        Ka = vec3(1.0, 1.0, 1.0); // Força a luz ambiente no MÁXIMO (vai revelar a cor real)
+        Ka = vec3(1.0, 1.0, 1.0); 
         Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.0, 0.0, 0.0); // Zera completamente o brilho especular (tira o efeito de óleo)
+        Ks = vec3(0.0, 0.0, 0.0); 
         q = 1.0;
-
-/*
-        Ka = vec3(0.2, 0.2, 0.2);
-        Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.8, 0.8, 0.8); // Olhos geralmente brilham mais (mais reflexivos)
-        q = 30.0;
-*/
     }
-    // Máscara Aku Aku
-    else if ( object_id == 8 ) // AKU_AKU
+    else if ( object_id == AKU_AKU || object_id == 8 ) 
     {
         U = texcoords.x;
         V = texcoords.y;
-        // Use a variável correspondente ao arquivo "lambert1_baseColor.png"
         Kd0 = texture(TextureImage8, vec2(U,V)).rgb;
-
         Ka = vec3(0.2, 0.2, 0.2);
         Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.1, 0.1, 0.1); // Madeira tem pouco brilho
+        Ks = vec3(0.1, 0.1, 0.1); 
         q = 10.0;
     }
 
-
-    // Equação de Iluminação
+    // Equação de Iluminação Direcional Global (Desativada a pedido)
     float lambert = max(0,dot(n,l));
 
-    color.rgb = Kd0 * (lambert + 0.01);
+    // -------------------------------------------------------------------------
+    // CÁLCULO DE ILUMINAÇÃO DAS TOCHAS (POINT LIGHTS COM TRANSLUCIDEZ)
+    // -------------------------------------------------------------------------
+    vec3 total_torch_lighting = vec3(0.0);
+    vec3 N_normalized = normalize(normal.xyz);
 
-    // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
-    // necessário:
-    // 1) Habilitar a operação de "blending" de OpenGL logo antes de realizar o
-    //    desenho dos objetos transparentes, com os comandos abaixo no código C++:
-    //      glEnable(GL_BLEND);
-    //      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    // 2) Realizar o desenho de todos objetos transparentes *após* ter desenhado
-    //    todos os objetos opacos; e
-    // 3) Realizar o desenho de objetos transparentes ordenados de acordo com
-    //    suas distâncias para a câmera (desenhando primeiro objetos
-    //    transparentes que estão mais longe da câmera).
-    // Alpha default = 1 = 100% opaco = 0% transparente
-    // Altere o final do seu shader_fragment.glsl para isso:
+    // ---- CÁLCULO TOCHA 1 ----
+    float d1 = length(v_ToLightTorch1.xyz); 
+    vec3 L1 = normalize(v_ToLightTorch1.xyz);
+    float dot_nl1;
+    if (object_id == SPHERE) {
+        dot_nl1 = dot(N_normalized, L1) * 0.5 + 0.5; // Iluminação que atravessa o vidro
+        dot_nl1 = pow(dot_nl1, 2.0);
+    } else {
+        dot_nl1 = max(dot(N_normalized, L1), 0.0);
+    }
+    vec3 diffuse1 = Kd0 * u_TorchColor * dot_nl1;
+    float attenuation1 = 1.0 / ((0.5 * d1) * (0.05 * d1) + 0.1); 
+    total_torch_lighting += diffuse1 * attenuation1;
+
+    // ---- CÁLCULO TOCHA 2 ----
+    float d2 = length(v_ToLightTorch2.xyz); 
+    vec3 L2 = normalize(v_ToLightTorch2.xyz);
+    float dot_nl2;
+    if (object_id == SPHERE) {
+        dot_nl2 = dot(N_normalized, L2) * 0.5 + 0.5;
+        dot_nl2 = pow(dot_nl2, 2.0);
+    } else {
+        dot_nl2 = max(dot(N_normalized, L2), 0.0);
+    }
+    vec3 diffuse2 = Kd0 * u_TorchColor * dot_nl2;
+    float attenuation2 = 1.0 / ((0.5 * d2) * (0.05 * d2) + 0.1); 
+    total_torch_lighting += diffuse2 * attenuation2;
+
+    // ---- CÁLCULO TOCHA 3 ----
+    float d3 = length(v_ToLightTorch3.xyz); 
+    vec3 L3 = normalize(v_ToLightTorch3.xyz);
+    float dot_nl3;
+    if (object_id == SPHERE) {
+        dot_nl3 = dot(N_normalized, L3) * 0.5 + 0.5;
+        dot_nl3 = pow(dot_nl3, 2.0);
+    } else {
+        dot_nl3 = max(dot(N_normalized, L3), 0.0);
+    }
+    vec3 diffuse3 = Kd0 * u_TorchColor * dot_nl3;
+    float attenuation3 = 1.0 / ((0.5 * d3) * (0.05 * d3) + 0.1); 
+    total_torch_lighting += diffuse3 * attenuation3;
+
+    // ---- CÁLCULO TOCHA 4 ----
+    float d4 = length(v_ToLightTorch4.xyz); 
+    vec3 L4 = normalize(v_ToLightTorch4.xyz);
+    float dot_nl4;
+    if (object_id == SPHERE) {
+        dot_nl4 = dot(N_normalized, L4) * 0.5 + 0.5;
+        dot_nl4 = pow(dot_nl4, 2.0);
+    } else {
+        dot_nl4 = max(dot(N_normalized, L4), 0.0);
+    }
+    vec3 diffuse4 = Kd0 * u_TorchColor * dot_nl4;
+    float attenuation4 = 1.0 / ((0.5 * d4) * (0.05 * d4) + 0.1); 
+    total_torch_lighting += diffuse4 * attenuation4;
+
+    // ---- CÁLCULO TOCHA 5 ----
+    float d5 = length(v_ToLightTorch5.xyz); 
+    vec3 L5 = normalize(v_ToLightTorch5.xyz);
+    float dot_nl5;
+    if (object_id == SPHERE) {
+        dot_nl5 = dot(N_normalized, L5) * 0.5 + 0.5;
+        dot_nl5 = pow(dot_nl5, 2.0);
+    } else {
+        dot_nl5 = max(dot(N_normalized, L5), 0.0);
+    }
+    vec3 diffuse5 = Kd0 * u_TorchColor * dot_nl5;
+    float attenuation5 = 1.0 / ((0.5 * d5) * (0.05 * d5) + 0.1); 
+    total_torch_lighting += diffuse5 * attenuation5;
+
+    // ---- CÁLCULO TOCHA 6 ----
+    float d6 = length(v_ToLightTorch6.xyz); 
+    vec3 L6 = normalize(v_ToLightTorch6.xyz);
+    float dot_nl6;
+    if (object_id == SPHERE) {
+        dot_nl6 = dot(N_normalized, L6) * 0.5 + 0.5;
+        dot_nl6 = pow(dot_nl6, 2.0);
+    } else {
+        dot_nl6 = max(dot(N_normalized, L6), 0.0);
+    }
+    vec3 diffuse6 = Kd0 * u_TorchColor * dot_nl6;
+    float attenuation6 = 1.0 / ((0.5 * d6) * (0.05 * d6) + 0.1); 
+    total_torch_lighting += diffuse6 * attenuation6;
+
+    // 1. Criamos uma variável para o brilho próprio do objeto (começa zerada para os outros objetos)
+    vec3 emissive_lighting = vec3(0.0);
+
+    // 2. Se for a esfera, damos a ela um brilho próprio alaranjado forte
+    if (object_id == SPHERE) {
+        emissive_lighting = vec3(1.0, 0.45, 0.1); // Cor do "fogo" emitido pela própria cápsula
+    }
+
+    // 3. Somamos esse brilho próprio na cor final
+    color.rgb = (Kd0 * (0.0)) + total_torch_lighting + emissive_lighting;
     
-    if ( object_id == WATER )
-    {
-        color.a = 0.5; // 50% de transparência. Menor = mais invisível, Maior = mais sólida.
-    }
-    else
-    {
-        color.a = 1.0; // Todos os outros objetos continuam 100% opacos
-    }
-
-    // Cor final com correção gamma (mantenha a linha que já existia)
-    color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
+    // Aplica a transparência calculada de cada objeto
+    color.a = alpha_output;
 
     // Cor final com correção gamma, considerando monitor sRGB.
-    // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
-} 
-
+}
