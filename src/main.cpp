@@ -221,14 +221,6 @@ bool g_UsePerspectiveProjection = true;
 // Variável que controla se o texto informativo será mostrado na tela.
 bool g_ShowInfoText = true;
 
-// ==========================================
-// VARIÁVEIS GLOBAIS DE POSIÇÃO DO CRASH
-// ==========================================
-glm::vec4 crash_position = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // Posição inicial (pé no chão)
-float crash_speed = 5.0f; // Velocidade de movimento (unidades por segundo)
-float last_time = 0.0f;   // Para calcular o tempo Delta (Dt)
-//===========================================
-
 // Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
 GLuint g_GpuProgramID = 0;
 GLint g_model_uniform;
@@ -240,6 +232,18 @@ GLint g_bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+// ==========================================
+// VARIÁVEIS DO CRASH E FÍSICA
+// ==========================================
+glm::vec4 crash_position = glm::vec4(0.0f, -0.8f, 0.0f, 1.0f); // Começa em Y = -0.8f
+float crash_velocity_y = 0.0f;
+float gravity = -18.0f;
+float jump_force = 8.0f;
+bool is_jumping = false;
+float ground_level = -0.8f; // Altura do chão inicial do Crash
+float last_time = 0.0f;     // Para o delta_t
+// ==========================================
 
 int main(int argc, char* argv[])
 {
@@ -385,6 +389,31 @@ int main(int argc, char* argv[])
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+        // ------------------------------------------
+        // CÁLCULO DO DELTA TIME E FÍSICA DO PULO
+        // ------------------------------------------
+        float current_time = (float)glfwGetTime();
+        float delta_t = current_time - last_time;
+        last_time = current_time;
+
+        // Comando de Pulo (Barra de Espaço)
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !is_jumping) {
+            crash_velocity_y = jump_force;
+            is_jumping = true;
+        }
+
+        // Aplica a gravidade e atualiza a posição
+        crash_velocity_y += gravity * delta_t;
+        crash_position.y += crash_velocity_y * delta_t;
+
+        // Colisão com o chão
+        if (crash_position.y <= ground_level) {
+            crash_position.y = ground_level;
+            crash_velocity_y = 0.0f;
+            is_jumping = false;
+        }
+        // ------------------------------------------
+
         // Aqui executamos as operações de renderização
 
         // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
@@ -402,13 +431,6 @@ int main(int argc, char* argv[])
         // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
-
-        // ------------------------------------------
-        // CÁLCULO DO DELTA TIME (Dt)
-        // ------------------------------------------
-        float current_time = (float)glfwGetTime();
-        float delta_t = current_time - last_time;
-        last_time = current_time;
 
         // =====================================================================
         // 1 e 2. SISTEMA DE CÂMERA LIVRE (VEM PRIMEIRO!)
@@ -611,7 +633,7 @@ int main(int argc, char* argv[])
 
         //MODELO DO CRASH
         // Translação usa as variáveis globais que estão sendo alteradas pelo teclado
-        model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z)
+        model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z) 
                         * Matrix_Scale(0.01f, 0.01f, 0.01f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         
