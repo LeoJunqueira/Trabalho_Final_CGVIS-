@@ -11,6 +11,16 @@ uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
+
+// Posições fixas das tochas (Mundo) vindo do C++
+uniform vec4 u_LightTorch1Pos;
+uniform vec4 u_LightTorch2Pos;
+uniform vec4 u_LightTorch3Pos;
+uniform vec4 u_LightTorch4Pos;
+uniform vec4 u_LightTorch5Pos;
+uniform vec4 u_LightTorch6Pos;
+
+
 // Atributos de vértice que serão gerados como saída ("out") pelo Vertex Shader.
 // ** Estes serão interpolados pelo rasterizador! ** gerando, assim, valores
 // para cada fragmento, os quais serão recebidos como entrada pelo Fragment
@@ -19,6 +29,16 @@ out vec4 position_world;
 out vec4 position_model;
 out vec4 normal;
 out vec2 texcoords;
+
+// Novas saídas: Vetores direcionais para cada tocha
+out vec4 v_ToLightTorch1;
+out vec4 v_ToLightTorch2;
+out vec4 v_ToLightTorch3;
+out vec4 v_ToLightTorch4;
+out vec4 v_ToLightTorch5;
+out vec4 v_ToLightTorch6;
+
+
 
 void main()
 {
@@ -63,5 +83,14 @@ void main()
 
     // Coordenadas de textura obtidas do arquivo OBJ (se existirem!)
     texcoords = texture_coefficients;
+
+    // === CALCULAR VETORES PARA AS DUAS LUZES DA TOCHA ===
+    v_ToLightTorch1 = u_LightTorch1Pos - position_world;
+    v_ToLightTorch2 = u_LightTorch2Pos - position_world;
+    v_ToLightTorch3 = u_LightTorch3Pos - position_world;
+    v_ToLightTorch4 = u_LightTorch4Pos - position_world;
+    v_ToLightTorch5 = u_LightTorch5Pos - position_world;
+    v_ToLightTorch6 = u_LightTorch6Pos - position_world;
+
 }
 

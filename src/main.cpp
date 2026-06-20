@@ -432,6 +432,45 @@ int main(int argc, char* argv[])
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
 
+        // Defina aqui a coordenada X, Y, Z exata de onde fica o fogo de cada tocha
+        // Altere os valores abaixo de acordo com as translações dos seus pilares!
+        //DIREITA
+        glm::vec4 tocha1_pos = glm::vec4(7.5f, 1.0f, 0.2f, 1.0f); // direita CENTRO
+        glm::vec4 tocha2_pos = glm::vec4(7.5f, 1.0f, 5.0f, 1.0f); 
+        glm::vec4 tocha3_pos = glm::vec4(7.5f, 1.0f, -4.6f, 1.0f); 
+
+        //ESQUERDA
+        glm::vec4 tocha4_pos = glm::vec4(-7.5f, 1.0f, 0.2f, 1.0f); 
+        glm::vec4 tocha5_pos = glm::vec4(-7.5f, 1.0f, 5.0f, 1.0f); 
+        glm::vec4 tocha6_pos = glm::vec4(-7.5f, 1.0f, -4.6f, 1.0f); 
+
+        // Pega os IDs de localização das variáveis criadas nos Shaders
+        GLint u_LightTorch1Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch1Pos");
+        GLint u_LightTorch2Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch2Pos");
+        GLint u_LightTorch3Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch3Pos");
+        GLint u_LightTorch4Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch4Pos");
+        GLint u_LightTorch5Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch5Pos");
+        GLint u_LightTorch6Pos_loc = glGetUniformLocation(g_GpuProgramID, "u_LightTorch6Pos");
+
+        GLint u_TorchColor_loc      = glGetUniformLocation(g_GpuProgramID, "u_TorchColor");
+
+        // Envia as posições das tochas para a GPU
+        glUniform4fv(u_LightTorch1Pos_loc, 1, glm::value_ptr(tocha1_pos));
+        glUniform4fv(u_LightTorch2Pos_loc, 1, glm::value_ptr(tocha2_pos));
+        glUniform4fv(u_LightTorch3Pos_loc, 1, glm::value_ptr(tocha3_pos));
+        glUniform4fv(u_LightTorch4Pos_loc, 1, glm::value_ptr(tocha4_pos));
+        glUniform4fv(u_LightTorch5Pos_loc, 1, glm::value_ptr(tocha5_pos));
+        glUniform4fv(u_LightTorch6Pos_loc, 1, glm::value_ptr(tocha6_pos));
+
+        // Envia a cor do fogo (laranja brilhante: R=1.0, G=0.5, B=0.1)
+        glm::vec3 cor_fogo = glm::vec3(1.0f, 0.5f, 0.1f);
+        glUniform3fv(u_TorchColor_loc, 1, glm::value_ptr(cor_fogo));
+
+
+
+
+
+
         // =====================================================================
         // 1 e 2. SISTEMA DE CÂMERA LIVRE (VEM PRIMEIRO!)
         // =====================================================================
@@ -562,6 +601,14 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 //-----------------------------------------------------------------------------------------------------------------
+
+        //desenhamos o teto
+
+        model = Matrix_Translate(0.0f, 6.2f, 0.2f) *
+                            Matrix_Scale(13.0f, 0.5f, 8.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, CUBE);
+        DrawVirtualObject("the_cube");
 
         // Desenhamos o plataforma
 
@@ -714,6 +761,14 @@ int main(int argc, char* argv[])
                     glUniform1i(g_object_id_uniform, PILAR);
                     DrawVirtualObject("pilar");
 
+                        model = Matrix_Translate(13.5f, 5.8f, -6.6f) 
+                            * Matrix_Rotate_Y(1.570796f)
+                                * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus o mantendon de pé
+                                    * Matrix_Scale(0.5f, 0.04f, 0.1f);
+                        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                        glUniform1i(g_object_id_uniform, PILAR);
+                        DrawVirtualObject("pilar");
+
 
         //-------------------------PAREDE CACHOEIRA ESQUERDA
         model = Matrix_Translate(-7.5f, 5.8f, -7.6f) 
@@ -731,6 +786,15 @@ int main(int argc, char* argv[])
                     glUniform1i(g_object_id_uniform, PILAR);
                     DrawVirtualObject("pilar");
 
+                        model = Matrix_Translate(-13.5f, 5.8f, -6.6f) 
+                            * Matrix_Rotate_Y(1.570796f)
+                                * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus o mantendon de pé
+                                    * Matrix_Scale(0.5f, 0.04f, 0.1f);
+                        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                        glUniform1i(g_object_id_uniform, PILAR);
+                        DrawVirtualObject("pilar");
+
+
 //-------------------------------------------------------------------------------------------------------------------
 
         //PILARES TOCHAS DIRETA
@@ -739,37 +803,21 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PILAR_TOCHA);
         DrawVirtualObject("the_pilar_tocha");
-        // "FOGO"
-        model = Matrix_Translate(7.5f, 1.0f, 0.2f)
-                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, SPHERE);
-        DrawVirtualObject("the_sphere");
-
+       
 
                     model = Matrix_Translate(7.5f, -1.2f, 5.0f) 
                                         * Matrix_Scale(1.0f, 1.0f, 1.0f);
                     glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                     glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                     DrawVirtualObject("the_pilar_tocha");
-                    // "FOGO"
-                    model = Matrix_Translate(7.5f, 1.0f, 5.0f)
-                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
-                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                    glUniform1i(g_object_id_uniform, SPHERE);
-                    DrawVirtualObject("the_sphere");
-                                
+                   
+                            
                                 model = Matrix_Translate(7.5f, -1.2f, -4.6f) 
                                                 * Matrix_Scale(1.0f, 1.0f, 1.0f);
                                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                                 glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                                 DrawVirtualObject("the_pilar_tocha");
-                                // "FOGO"
-                                model = Matrix_Translate(7.5f, 1.0f, -4.6f)
-                                                * Matrix_Scale(0.3f, 0.3f, 0.3f);
-                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                                glUniform1i(g_object_id_uniform, SPHERE);
-                                DrawVirtualObject("the_sphere");
+                               
 
         //PILARES TOCHAS ESQUERDA
         model = Matrix_Translate(-7.5f, -1.2f, 0.2f) 
@@ -777,37 +825,21 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PILAR_TOCHA);
         DrawVirtualObject("the_pilar_tocha");
-        // "FOGO"
-        model = Matrix_Translate(-7.5f, 1.0f, 0.2f)
-                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, SPHERE);
-        DrawVirtualObject("the_sphere");
-
-
+        
                     model = Matrix_Translate(-7.5f, -1.2f, 5.0f) 
                                         * Matrix_Scale(1.0f, 1.0f, 1.0f);
                     glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                     glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                     DrawVirtualObject("the_pilar_tocha");
-                    // "FOGO"
-                    model = Matrix_Translate(-7.5f, 1.0f, 5.0f)
-                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
-                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                    glUniform1i(g_object_id_uniform, SPHERE);
-                    DrawVirtualObject("the_sphere");
+                   
 
                                 model = Matrix_Translate(-7.5f, -1.2f, -4.6f) 
                                                 * Matrix_Scale(1.0f, 1.0f, 1.0f);
                                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                                 glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                                 DrawVirtualObject("the_pilar_tocha");
-                                // "FOGO"
-                                model = Matrix_Translate(-7.5f, 1.0f, -4.6f)
-                                                * Matrix_Scale(0.3f, 0.3f, 0.3f);
-                                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                                glUniform1i(g_object_id_uniform, SPHERE);
-                                DrawVirtualObject("the_sphere");
+                                
+                                
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -862,6 +894,56 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, WATER);
         DrawVirtualObject("the_plane"); 
+
+
+        //===========================FOGOS======================================
+
+        //DIREITA  CENTRO
+        model = Matrix_Translate(7.5f, 1.0f, 0.2f)
+                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, SPHERE);
+        DrawVirtualObject("the_sphere");
+
+
+        //DIREITA INFERIOR
+         model = Matrix_Translate(7.5f, 1.0f, 5.0f)
+                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, SPHERE);
+                    DrawVirtualObject("the_sphere");
+
+        //DIREITA SUPERIOR
+        model = Matrix_Translate(7.5f, 1.0f, -4.6f)
+                    * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, SPHERE);
+                DrawVirtualObject("the_sphere");
+
+
+        //ESQUERDA CENTRO
+        model = Matrix_Translate(-7.5f, 1.0f, 0.2f)
+                            * Matrix_Scale(0.3f, 0.3f, 0.3f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, SPHERE);
+        DrawVirtualObject("the_sphere");
+
+
+        //ESQUERDA INFERIOR
+         model = Matrix_Translate(-7.5f, 1.0f, 5.0f)
+                                        * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                    glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(g_object_id_uniform, SPHERE);
+                    DrawVirtualObject("the_sphere");
+
+        //ESQUERDA SUPERIOR
+        model = Matrix_Translate(-7.5f, 1.0f, -4.6f)
+                    * Matrix_Scale(0.3f, 0.3f, 0.3f);
+                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, SPHERE);
+                DrawVirtualObject("the_sphere");
+
+
 
         // 3. Desabilitamos o blending para não afetar o texto da tela ou outros frames
         glDisable(GL_BLEND);
