@@ -201,6 +201,9 @@ float g_CameraDistance = 20.0f; // Distância da câmera para a origem
 
 glm::vec4 g_CameraPosition = glm::vec4(0.0f, 5.0f, 11.0f, 1.0f); // Posição inicial da câmera
 
+// Controlo do tipo de câmara (True = 3ª Pessoa, False = 1ª Pessoa)
+bool g_UseThirdPersonCamera = true;
+
 // Variáveis para saber quais teclas estão pressionadas
 bool g_W_Pressed = false;
 bool g_A_Pressed = false;
@@ -682,61 +685,67 @@ int main(int argc, char* argv[])
         glm::vec3 cor_fogo = glm::vec3(1.0f, 0.5f, 0.1f);
         glUniform3fv(u_TorchColor_loc, 1, glm::value_ptr(cor_fogo));
 
+        // =====================================================================
+        // 1. SISTEMA DE CÂMERAS (Aberta/Livre e 1ª Pessoa)
+        // =====================================================================
+        float cam_y = sin(g_CameraPhi);
+        float cam_z = cos(g_CameraPhi) * cos(g_CameraTheta);
+        float cam_x = cos(g_CameraPhi) * sin(g_CameraTheta);
 
+        // Vetor de visão (Para onde o mouse aponta)
+        glm::vec4 camera_look_dir = glm::normalize(glm::vec4(cam_x, cam_y, cam_z, 0.0f)); 
+        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
 
+        // Vetor lateral (Para a câmera poder andar de lado nas setas)
+        glm::vec3 view_3 = glm::vec3(camera_look_dir.x, camera_look_dir.y, camera_look_dir.z);
+        glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, glm::vec3(0.0f, 1.0f, 0.0f))), 0.0f);
 
+        if (g_UseThirdPersonCamera) {
+            // CÂMERA ABERTA (Livre)
+            // A posição só muda se você apertar as setas do teclado!
+            float camera_speed = 5.0f; 
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)    g_CameraPosition += camera_look_dir * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)  g_CameraPosition -= camera_look_dir * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) g_CameraPosition += camera_side_vector * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)  g_CameraPosition -= camera_side_vector * camera_speed * delta_t;
+        } else {
+            // PRIMEIRA PESSOA
+            // A câmera é "teleportada" para a cabeça do Crash a cada frame
+            glm::vec4 head_offset = glm::vec4(0.0f, 0.7f, 0.0f, 0.0f); // Altura dos olhos
+            g_CameraPosition = crash_position + head_offset;
+        }
 
+        // Criamos a matriz View
+        glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_look_dir, camera_up_vector);
 
         // =====================================================================
-        // 1 e 2. SISTEMA DE CÂMERA LIVRE (VEM PRIMEIRO!)
-        // =====================================================================
-        // Calculamos a direção para onde o mouse está olhando
-        float r = 1.0f;
-        float cam_y = r * sin(g_CameraPhi);
-        float cam_z = r * cos(g_CameraPhi) * cos(g_CameraTheta);
-        float cam_x = r * cos(g_CameraPhi) * sin(g_CameraTheta);
-
-        // Vetor de visão e Vetor Up
-        glm::vec4 camera_view_vector = glm::vec4(cam_x, cam_y, cam_z, 0.0f); 
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
-
-        // Calculamos o vetor lateral para poder andar de lado (Strafe)
-        glm::vec3 view_3 = glm::vec3(camera_view_vector.x, camera_view_vector.y, camera_view_vector.z);
-        glm::vec3 up_3   = glm::vec3(camera_up_vector.x, camera_up_vector.y, camera_up_vector.z);
-        glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, up_3)), 0.0f);
-
-
-        // =====================================================================
-        // 3. MOVIMENTAÇÃO DA CÂMERA (AGORA NAS SETAS)
-        // =====================================================================
-        // Como estamos multiplicando por delta_t (que é pequeno), a velocidade base precisa ser maior (ex: 5.0f)
-        float camera_speed = 5.0f; 
-
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)    g_CameraPosition += camera_view_vector * camera_speed * delta_t;
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)  g_CameraPosition -= camera_view_vector * camera_speed * delta_t;
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) g_CameraPosition += camera_side_vector * camera_speed * delta_t;
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)  g_CameraPosition -= camera_side_vector * camera_speed * delta_t;
-
-
-        // =====================================================================
-        // 3.5. MOVIMENTAÇÃO DO CRASH (WASD)
+        // 2. MOVIMENTAÇÃO DO CRASH (WASD)
         // =====================================================================
         float crash_speed = 5.0f; 
 
-        // Eixo Z absoluto (Frente e Trás)
-        if (g_W_Pressed) crash_position.z -= crash_speed * delta_t;
-        if (g_S_Pressed) crash_position.z += crash_speed * delta_t;
+        // O Crash sempre anda relativo para onde a câmera está olhando no eixo horizontal (chão)
+        glm::vec3 forward_dir = glm::normalize(glm::vec3(camera_look_dir.x, 0.0f, camera_look_dir.z));
+        glm::vec3 right_dir = glm::normalize(glm::cross(forward_dir, glm::vec3(0.0f, 1.0f, 0.0f)));
 
-        // Eixo X absoluto (Esquerda e Direita)
-        if (g_D_Pressed) crash_position.x += crash_speed * delta_t;
-        if (g_A_Pressed) crash_position.x -= crash_speed * delta_t;
+        // Eixo Z (Frente e Trás)
+        if (g_W_Pressed) {
+            crash_position.x += forward_dir.x * crash_speed * delta_t;
+            crash_position.z += forward_dir.z * crash_speed * delta_t;
+        }
+        if (g_S_Pressed) {
+            crash_position.x -= forward_dir.x * crash_speed * delta_t;
+            crash_position.z -= forward_dir.z * crash_speed * delta_t;
+        }
 
-
-        // =====================================================================
-        // 4. COMPUTAMOS A MATRIZ VIEW
-        // =====================================================================
-        glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_view_vector, camera_up_vector);
-    
+        // Eixo X (Esquerda e Direita)
+        if (g_A_Pressed) {
+            crash_position.x -= right_dir.x * crash_speed * delta_t;
+            crash_position.z -= right_dir.z * crash_speed * delta_t;
+        }
+        if (g_D_Pressed) {
+            crash_position.x += right_dir.x * crash_speed * delta_t;
+            crash_position.z += right_dir.z * crash_speed * delta_t;
+        }
         // =====================================================================
 
         // Agora computamos a matriz de Projeção.
@@ -2008,6 +2017,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_O && action == GLFW_PRESS)
     {
         g_UsePerspectiveProjection = false;
+    }
+
+    // Se o utilizador premir a tecla C, alterna o tipo de câmara
+    if (key == GLFW_KEY_C && action == GLFW_PRESS)
+    {
+        g_UseThirdPersonCamera = !g_UseThirdPersonCamera;
     }
 
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
