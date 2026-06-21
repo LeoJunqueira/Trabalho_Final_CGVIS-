@@ -200,6 +200,9 @@ float g_CameraPhi = -0.5f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 20.0f; // Distância da câmera para a origem
 
 glm::vec4 g_CameraPosition = glm::vec4(0.0f, 5.0f, 11.0f, 1.0f); // Posição inicial da câmera
+glm::vec4 g_SavedThirdPersonPosition = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);//salva posição anterior
+float g_SavedCameraTheta = 0.0f; // Salva rotação horizontal
+float g_SavedCameraPhi   = 0.0f; // Salva rotação vertical 
 
 // Controlo do tipo de câmara (True = 3ª Pessoa, False = 1ª Pessoa)
 bool g_UseThirdPersonCamera = true;
@@ -327,11 +330,19 @@ glm::vec3 CalculateBoxPosition(float current_time, float offset_time, float pos_
 struct BoundingBox {
     glm::vec3 min;
     glm::vec3 max;
-    std::string type; // Ex: "plataforma", "parede", "caixa_explosiva"
+    std::string type; // Ex: "plataforma", "parede", "tnt"
+    int id = -1;      // NOVO: Identificador para as caixas específicas
 };
 
 // Lista de todas as colisões do cenário
 std::vector<BoundingBox> world_collisions;
+
+// ==========================================
+// CONTROLE DE HIT DAS CAIXAS TNT (0 a 3)
+// ==========================================
+bool caixa_atingida[4] = {false, false, false, false};
+float tempo_hit_caixa[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+bool caixa_destruida[4] = {false, false, false, false};
 
 int main(int argc, char* argv[])
 {
@@ -419,6 +430,10 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/lambert1_emissive.png");   // Textura Aku emissive 09
     LoadTextureImage("../../data/lambert1_metallicRoughness.png");   // Textura Aku metallic 10
     LoadTextureImage("../../data/lambert1_normal.png");   // Textura Aku normal 11
+    LoadTextureImage("../../data/caixaTNT.png");  // Textura para as caixas de TNT 12 
+    LoadTextureImage("../../data/PLATAFORMAA.png");  // plataforma 13
+    LoadTextureImage("../../data/teste.png");  // pilar com tocha 14
+    LoadTextureImage("../../data/pilar.png");  // pilar com tocha 15
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -477,7 +492,7 @@ int main(int argc, char* argv[])
     // ==========================================
     // INICIALIZAÇÃO DAS COLISÕES DO CENÁRIO
     // ==========================================
-    // A escala padrão que o Isaac usou nas 9 plataformas de pedra
+    // A escala padrão que o Isasc usou nas 9 plataformas de pedra
     glm::vec3 plat_scale = glm::vec3(1.0f, 0.5f, 1.0f);
 
     // Mapeamento exato das posições XYZ das matrizes de translação
@@ -517,6 +532,13 @@ int main(int argc, char* argv[])
     glm::vec3 ripper_pos = glm::vec3(0.0f, -0.7f, 0.2f);
     //-------------------------------------------
 
+    float crash_rotation_angle = 0.0f;
+    float ripper_rotation_angle = 0.0f;
+    float g_CrashJumpSpinAngle = 0.0f; // Ângulo de rotação extra para o pulo
+
+//=======================================================================================================
+//============================ LOOP PRINCIPAL DO GAME ===================================================
+//=======================================================================================================
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -544,7 +566,7 @@ int main(int argc, char* argv[])
 
         bool is_grounded = false;
 
-        // --- ATUALIZAÇÃO DAS CAIXAS DINÂMICAS NESTE FRAME ---
+  // --- ATUALIZAÇÃO DAS CAIXAS DINÂMICAS NESTE FRAME ---
         std::vector<BoundingBox> current_frame_collisions = world_collisions; // Copia as plataformas fixas
         
         // Coordenadas X das trilhas da água
@@ -559,25 +581,88 @@ int main(int argc, char* argv[])
             CalculateBoxPosition(current_time, 12.0f, right_track_x) // Direita 2 (3 Fases de atraso)
         };
 
-        // Adicionamos a "Hitbox" de cada caixa na física do jogo
-        glm::vec3 tnt_scale = glm::vec3(0.7f, 0.7f, 0.7f); // O mesmo scale usado no Matrix_Scale do Isaac
-        for (glm::vec3 box_pos : active_boxes) {
-            BoundingBox tnt_box;
-            tnt_box.min = box_pos - tnt_scale;
-            tnt_box.max = box_pos + tnt_scale;
-            tnt_box.type = "tnt";
-            current_frame_collisions.push_back(tnt_box);
+        // =========================================================================
+        // Lógica de tempo das caixas (sumir, explodir lateralmente e resetar respawn)
+        // =========================================================================
+        for (int i = 0; i < 4; i++) {
+            // Se a caixa foi atingida e ACABOU de passar 3 segundos (e ainda não estava marcada como destruída)
+            if (caixa_atingida[i] && !caixa_destruida[i] && (current_time - tempo_hit_caixa[i] >= 3.0f)) {
+                
+                // --- NOVA LÓGICA DE EXPLOSÃO LATERAL ---
+                glm::vec3 box_pos = active_boxes[i];
+                glm::vec3 crash_xyz = glm::vec3(crash_position.x, crash_position.y, crash_position.z);
+
+                // 1. Verifica se o Crash está na mesma "linha" (proximidade no eixo Z)
+                // Usamos uma margem de 1.8 metros para cobrir a largura da plataforma lateral
+                if (std::abs(crash_xyz.z - box_pos.z) < 1.8f) {
+                    
+                    // 2. Se a caixa explodiu na Esquerda (X < 0) e o Crash está na plataforma da Esquerda (X < 0)...
+                    // Ou se a caixa explodiu na Direita (X > 0) e o Crash está na plataforma da Direita (X > 0)...
+                    if ((box_pos.x < 0.0f && crash_xyz.x < 0.0f) || 
+                        (box_pos.x > 0.0f && crash_xyz.x > 0.0f)) {
+                        
+                        // O Crash foi pego pela onda de choque na lateral! Respawn
+                        crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); 
+                        crash_velocity_y = 0.0f;
+                    }
+                }
+
+                // Desativa a caixa definitivamente neste ciclo
+                caixa_destruida[i] = true;
+
+                // --- O RIPPER ROO TAMBÉM MORRE COM A EXPLOSÃO ---
+                // Se o Ripper Roo estiver perto o suficiente da caixa quando ela explodir
+                // (distância equivalente ao tamanho de uma plataforma), ele "morre":
+                // volta para a posição inicial e reinicia a rota de pulos.
+                glm::vec3 ripper_xyz = ripper_pos;
+                float ripper_explosion_radius = 5.0f; // Largura de uma plataforma (plat_scale.x * 2)
+                if (glm::length(ripper_xyz - box_pos) < ripper_explosion_radius) {
+                    ripper_path_index = 0;
+                    ripper_timer = 0.0f;
+                    ripper_pos = platform_positions[ripper_path[0]];
+                    ripper_pos.y = -0.7f;
+                }
+            }
+
+            // Se a caixa completou a volta e está voltando para o topo da cachoeira (Y alto), reseta!
+            if (active_boxes[i].y > 10.0f) {
+                caixa_atingida[i] = false;
+                caixa_destruida[i] = false;
+            }
         }
 
-        // 3. Verifica se essa nova posição atravessou alguma plataforma de pedra
+        // Adicionamos a "Hitbox" de cada caixa na física do jogo (se não estiver destruída)
+        glm::vec3 tnt_scale = glm::vec3(0.9f, 0.9f, 0.7f); 
+        for (int i = 0; i < 4; i++) {
+            if (!caixa_destruida[i]) {
+                BoundingBox tnt_box;
+                tnt_box.min = active_boxes[i] - tnt_scale;
+                tnt_box.max = active_boxes[i] + tnt_scale;
+                tnt_box.type = "tnt";
+                tnt_box.id = i; // Guarda o ID da caixa (0 a 3)
+                current_frame_collisions.push_back(tnt_box);
+            }
+        }
+
+        // =========================================================================
+        //  Verifica se essa nova posição atravessou alguma plataforma ou caixa
+        // =========================================================================
         for (BoundingBox& plat : current_frame_collisions) {
             if (CheckAABBCollision(crash_box.min, crash_box.max, plat.min, plat.max)) {
                 // Se bateu na plataforma e a velocidade estava puxando para baixo (caindo)...
                 if (crash_velocity_y <= 0.0f) {
-                    crash_position.y = plat.max.y; // Crava a bota do Crash EXATAMENTE no topo do .obj da pedra
+                    crash_position.y = plat.max.y; // Crava a bota do Crash no topo
                     crash_velocity_y = 0.0f;       // Zera o impacto da queda
                     is_grounded = true;
-                    break; // Já achou o chão, não precisa testar os outros cubos
+                    
+                    // Se o chão que ele pisou for uma caixa TNT ativa o cronômetro
+                    if (plat.type == "tnt" && plat.id >= 0) {
+                        if (!caixa_atingida[plat.id]) { 
+                            caixa_atingida[plat.id] = true;
+                            tempo_hit_caixa[plat.id] = current_time;
+                        }
+                    }
+                    break; // Já achou o chão, sai do loop
                 }
             }
         }
@@ -585,6 +670,7 @@ int main(int argc, char* argv[])
         // 4. Comando de Pulo (Só funciona se estiver com o pé firme na pedra)
         if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && is_grounded) {
             crash_velocity_y = jump_force;
+            is_grounded = false; // <-- NOVO: Avisa o jogo na mesma hora que ele saiu do chão!
         }
 
         // 5. CAIU NA ÁGUA! (Game Over e Respawn)
@@ -592,46 +678,74 @@ int main(int argc, char* argv[])
             crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); // Cai do céu no centro
             crash_velocity_y = 0.0f;
         }
-        // ------------------------------------------
+        
+        // ------------------------------------------------------------------
+        // ----------------- ATUALIZAÇÃO DO GIRO DO PULO --------------------
+        // ------------------------------------------------------------------
+        if (!is_grounded) 
+        {
+            // Se não está no chão, acumula o giro usando o delta_t lá do início do loop
+            g_CrashJumpSpinAngle += 7.7f * delta_t; 
+        }
+        else
+        {
+            // Se tocou em uma plataforma fixa ou caixa TNT, reseta o ângulo para ficar reto
+            g_CrashJumpSpinAngle = 0.0f;
+        }
+        // ------------------------------------------------------------------
 
-        // ------------------------------------------
-        // IA DO RIPPER ROO (COMPORTAMENTO)
+       // ------------------------------------------
+        // IA DO RIPPER ROO (VOLTANDO AO PADRÃO DA FÍSICA)
         // ------------------------------------------
         ripper_timer += delta_t;
         float total_state_time = ripper_jump_duration + ripper_wait_duration;
         
-        // Descobre de onde ele sai e para onde ele vai
         int current_node = ripper_path[ripper_path_index];
         int next_node = ripper_path[(ripper_path_index + 1) % ripper_path.size()];
         
-        // Pega as posições X e Z das plataformas do cenário
         glm::vec3 start_pos = platform_positions[current_node];
         glm::vec3 end_pos = platform_positions[next_node];
         
-        // Ajusta o Y para o topo exato da plataforma de pedra
         start_pos.y = -0.7f; 
         end_pos.y = -0.7f;   
+
+        // Cálculo da rotação
+        float dir_x = end_pos.x - start_pos.x;
+        float dir_z = end_pos.z - start_pos.z;
+
+        if (std::abs(dir_x) > 0.01f || std::abs(dir_z) > 0.01f) {
+            ripper_rotation_angle = std::atan2(dir_x, dir_z);
+        }
         
         if (ripper_timer <= ripper_wait_duration) {
-            // ESTADO 1: Parado no chão (Preparando o pulo)
             ripper_pos = start_pos;
         } else if (ripper_timer <= total_state_time) {
-            // ESTADO 2: Voando no ar (Interpolação)
             float jump_progress = (ripper_timer - ripper_wait_duration) / ripper_jump_duration;
             
-            // Movimenta no plano (X e Z)
             ripper_pos.x = glm::mix(start_pos.x, end_pos.x, jump_progress);
             ripper_pos.z = glm::mix(start_pos.z, end_pos.z, jump_progress);
             
-            // Movimenta a altura (A famosa Parábola do pulo)
             float jump_arc = 1.0f - pow(2.0f * jump_progress - 1.0f, 2.0f);
-            ripper_pos.y = start_pos.y + (jump_arc * 3.0f); // Ele atinge 3.0 de altura no meio do pulo!
+            ripper_pos.y = start_pos.y + (jump_arc * 3.0f); 
         } else {
-            // ESTADO 3: Aterrissou! (Avança para a próxima plataforma e reseta a mente)
             ripper_timer = 0.0f;
             ripper_path_index = (ripper_path_index + 1) % ripper_path.size();
         }
+
         // ------------------------------------------
+        // COLISÃO: RIPPER ROO MATA O CRASH
+        // ------------------------------------------
+        // Monta a hitbox do Ripper Roo em volta de ripper_pos
+        glm::vec3 ripper_fat = glm::vec3(0.5f, 0.8f, 0.5f);
+        glm::vec3 ripper_box_min = glm::vec3(ripper_pos.x - ripper_fat.x, ripper_pos.y, ripper_pos.z - ripper_fat.z);
+        glm::vec3 ripper_box_max = glm::vec3(ripper_pos.x + ripper_fat.x, ripper_pos.y + ripper_fat.y, ripper_pos.z + ripper_fat.z);
+
+        // Reaproveita a hitbox do Crash (crash_box) já calculada acima neste mesmo frame
+        if (CheckAABBCollision(crash_box.min, crash_box.max, ripper_box_min, ripper_box_max)) {
+            // O Crash encostou no Ripper Roo: "morre" e respawna no centro
+            crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f);
+            crash_velocity_y = 0.0f;
+        }
 
         // Aqui executamos as operações de renderização
 
@@ -650,6 +764,27 @@ int main(int argc, char* argv[])
         // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
         // os shaders de vértice e fragmentos).
         glUseProgram(g_GpuProgramID);
+
+        // --- FORÇAR VINCULAÇÃO DOS SLOTS DE TEXTURA ---
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage9"), 9);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage10"), 10);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage11"), 11);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage12"), 12);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage13"), 13);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage14"), 14);
+        glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage15"), 15);
+// ----------------------------------------------
+
+        
 
         // Defina aqui a coordenada X, Y, Z exata de onde fica o fogo de cada tocha
         // Altere os valores abaixo de acordo com as translações dos seus pilares!
@@ -711,14 +846,14 @@ int main(int argc, char* argv[])
         } else {
             // PRIMEIRA PESSOA
             // A câmera é "teleportada" para a cabeça do Crash a cada frame
-            glm::vec4 head_offset = glm::vec4(0.0f, 0.7f, 0.0f, 0.0f); // Altura dos olhos
+            glm::vec4 head_offset = glm::vec4(0.0f, 1.5f, 0.3f, 0.0f); // Altura dos olhos
             g_CameraPosition = crash_position + head_offset;
         }
 
         // Criamos a matriz View
         glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_look_dir, camera_up_vector);
 
-        // =====================================================================
+       // =====================================================================
         // 2. MOVIMENTAÇÃO DO CRASH (WASD)
         // =====================================================================
         float crash_speed = 5.0f; 
@@ -727,24 +862,36 @@ int main(int argc, char* argv[])
         glm::vec3 forward_dir = glm::normalize(glm::vec3(camera_look_dir.x, 0.0f, camera_look_dir.z));
         glm::vec3 right_dir = glm::normalize(glm::cross(forward_dir, glm::vec3(0.0f, 1.0f, 0.0f)));
 
+        // NOVO: Criamos um vetor para acumular a direção do movimento do frame
+        glm::vec3 move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
+
         // Eixo Z (Frente e Trás)
         if (g_W_Pressed) {
-            crash_position.x += forward_dir.x * crash_speed * delta_t;
-            crash_position.z += forward_dir.z * crash_speed * delta_t;
+            move_direction += forward_dir;
         }
         if (g_S_Pressed) {
-            crash_position.x -= forward_dir.x * crash_speed * delta_t;
-            crash_position.z -= forward_dir.z * crash_speed * delta_t;
+            move_direction -= forward_dir;
         }
 
         // Eixo X (Esquerda e Direita)
         if (g_A_Pressed) {
-            crash_position.x -= right_dir.x * crash_speed * delta_t;
-            crash_position.z -= right_dir.z * crash_speed * delta_t;
+            move_direction -= right_dir;
         }
         if (g_D_Pressed) {
-            crash_position.x += right_dir.x * crash_speed * delta_t;
-            crash_position.z += right_dir.z * crash_speed * delta_t;
+            move_direction += right_dir;
+        }
+
+        // Se houve algum movimento neste frame, atualizamos a posição e a rotação
+        if (glm::length(move_direction) > 0.0f) {
+            move_direction = glm::normalize(move_direction);
+            
+            // Aplica o movimento na posição do Crash
+            crash_position.x += move_direction.x * crash_speed * delta_t;
+            crash_position.z += move_direction.z * crash_speed * delta_t;
+
+            // CÁLCULO DA ROTAÇÃO: atan2 calcula o ângulo baseado nos eixos X e Z do movimento
+            // Nota: Usamos move_direction.x e move_direction.z para ele girar baseado no mundo e na câmera!
+            crash_rotation_angle = std::atan2(move_direction.x, move_direction.z);
         }
         // =====================================================================
 
@@ -798,7 +945,7 @@ int main(int argc, char* argv[])
         #define RIPPER_ROO_EYES 10
         #define AKU_AKU 11
 
-        
+      
         
         /*
 
@@ -903,15 +1050,22 @@ int main(int argc, char* argv[])
 
 //-------------------------------------------------------------------------------------------------------------------
 
-        //MODELO DO CRASH
-        // Translação usa as variáveis globais que estão sendo alteradas pelo teclado
-        model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z) 
-                        * Matrix_Scale(0.01f, 0.01f, 0.01f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        
-        // Corpo
-        glUniform1i(g_object_id_uniform, CRASH);
-        DrawVirtualObject("crash");  // Nome do arquivo .OBJ
+       // MODELO DO CRASH
+        // Só renderiza o personagem se estivermos na câmera de terceira pessoa!
+        if (g_UseThirdPersonCamera)
+        {
+            // Monta a matriz do modelo acumulando as transformações
+            model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z) 
+                    * Matrix_Rotate_Y(crash_rotation_angle)   // Rotação de direção (para onde ele anda)
+                    * Matrix_Rotate_X(g_CrashJumpSpinAngle)   // NOVO: Giro extra do pulo!
+                    * Matrix_Scale(0.01f, 0.01f, 0.01f);
+                    
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            
+            // Corpo
+            glUniform1i(g_object_id_uniform, CRASH);
+            DrawVirtualObject("crash");  // Nome do arquivo .OBJ
+        }
 /*
         // Necessário alterar o Crash no Blender para separar os objetos.
         // Sapatos
@@ -1018,83 +1172,105 @@ int main(int argc, char* argv[])
                         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                         glUniform1i(g_object_id_uniform, PILAR);
                         DrawVirtualObject("pilar");
+        
+        
+         //-------------------------PAREDE CACHOEIRA CENTRO (ATRÁS)
+        model = Matrix_Translate(0.0f, 5.8f, -9.9f)
+                        * Matrix_Rotate_X(1.570796f) // Rotaciona 90 graus
+                            * Matrix_Scale(0.5f, 0.04f, 0.1f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("pilar");
 
 
 //-------------------------------------------------------------------------------------------------------------------
 
         //PILARES TOCHAS DIRETA
-        model = Matrix_Translate(7.5f, -1.2f, 0.2f) 
+        model = Matrix_Translate(7.5f, -0.5f, 0.2f) 
                             * Matrix_Scale(1.0f, 1.0f, 1.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PILAR_TOCHA);
         DrawVirtualObject("the_pilar_tocha");
        
 
-                    model = Matrix_Translate(7.5f, -1.2f, 5.0f) 
+                    model = Matrix_Translate(7.5f, -0.5f, 5.0f) 
                                         * Matrix_Scale(1.0f, 1.0f, 1.0f);
                     glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                     glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                     DrawVirtualObject("the_pilar_tocha");
                    
                             
-                                model = Matrix_Translate(7.5f, -1.2f, -4.6f) 
+                                model = Matrix_Translate(7.5f, -0.5f, -4.6f) 
                                                 * Matrix_Scale(1.0f, 1.0f, 1.0f);
                                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                                 glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                                 DrawVirtualObject("the_pilar_tocha");
+
+         //chão dos pilares         
+        model = Matrix_Translate(7.6f, -1.9f, 0.2f) *
+                            Matrix_Scale(1.0f, 1.0f, 9.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("the_cube");
                                
 
         //PILARES TOCHAS ESQUERDA
-        model = Matrix_Translate(-7.5f, -1.2f, 0.2f) 
+        model = Matrix_Translate(-7.5f, -0.5f, 0.2f) 
                             * Matrix_Scale(1.0f, 1.0f, 1.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PILAR_TOCHA);
         DrawVirtualObject("the_pilar_tocha");
         
-                    model = Matrix_Translate(-7.5f, -1.2f, 5.0f) 
+                    model = Matrix_Translate(-7.5f, -0.5f, 5.0f) 
                                         * Matrix_Scale(1.0f, 1.0f, 1.0f);
                     glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                     glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                     DrawVirtualObject("the_pilar_tocha");
                    
 
-                                model = Matrix_Translate(-7.5f, -1.2f, -4.6f) 
+                                model = Matrix_Translate(-7.5f, -0.5f, -4.6f) 
                                                 * Matrix_Scale(1.0f, 1.0f, 1.0f);
                                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                                 glUniform1i(g_object_id_uniform, PILAR_TOCHA);
                                 DrawVirtualObject("the_pilar_tocha");
+                       //chão dos pilares         
+        model = Matrix_Translate(-7.6f, -1.9f, 0.2f) *
+                            Matrix_Scale(1.0f, 1.0f, 9.0f);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, PILAR);
+        DrawVirtualObject("the_cube");
                                 
                                 
 
 //-------------------------------------------------------------------------------------------------------------------
 
         // CAIXAS EXPLOSIVAS DINÂMICAS
-        for (glm::vec3 box_pos : active_boxes) {
-            // Só desenha se a caixa não estiver "escondida" no fundo da água
-            if (box_pos.y > -5.0f) {
+        for (int i = 0; i < 4; i++) {
+            glm::vec3 box_pos = active_boxes[i];
+            
+            // Só desenha se a caixa não estiver no fundo da água E não estiver destruída
+            if (box_pos.y > -5.0f && !caixa_destruida[i]) {
                 model = Matrix_Translate(box_pos.x, box_pos.y, box_pos.z) *
-                        Matrix_Scale(0.7f, 0.7f, 0.7f);
+                        Matrix_Scale(0.9f, 0.9f, 0.7f);
                 
                 glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
                 glUniform1i(g_object_id_uniform, CAIXA_EXPLOSIVA);
-                DrawVirtualObject("the_cube"); // Certifique-se de que o objeto CAIXA_EXPLOSIVA está carregado corretamente no seu .obj
+                DrawVirtualObject("the_cube"); 
             }
         }
 // ----------------------------------------------------------------------------------
 
-        // ----------------------------------------------------------------------------------
-        // MODELO DO RIPPER ROO (COM CORREÇÃO DE PIVÔ)
-        // ----------------------------------------------------------------------------------
-        // A modelagem original do Ripper Roo vinha com quatro modelos distintos lado a lado.
-        // O modelo que foi escolhido não estava na centro, logo o pivô dele fica um pouco deslocado.
-        float offset_x = 2.7f;  // Ajuste de posição se ele estiver caindo muito para direita ou para esquerda
-        float offset_y = 0.0f;  // A altura já foi configurada no motor da IA
-        float offset_z = 0.0f;  // Ajuste de posição se ele estiver caindo muito para frente ou para trás
+       // ------------------------------------------------------------------
+        // MODELO DO RIPPER ROO (ORDEM CORRETA DE MATRIZES)
+        // ------------------------------------------------------------------
+        float offset_x = 2.7f;  
 
-        // Somamos o offset apenas na hora de renderizar a imagem
-        model = Matrix_Translate(ripper_pos.x + offset_x, 
-                                 ripper_pos.y + offset_y, 
-                                 ripper_pos.z + offset_z) 
+        // 1. Translação para a posição global da IA (onde a plataforma realmente está)
+        model = Matrix_Translate(ripper_pos.x, ripper_pos.y, ripper_pos.z)
+              // 2. Rotação Y para olhar para o alvo
+              * Matrix_Rotate_Y(ripper_rotation_angle)
+              // 3. Ajuste do pivô local (somente no modelo 3D) e escala
+              * Matrix_Translate(offset_x, 0.0f, 0.0f)
               * Matrix_Scale(0.09f, 0.09f, 0.09f);
         
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -1115,7 +1291,7 @@ int main(int argc, char* argv[])
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Ajuste a escala para cobrir o tamanho do seu cenário
-        model = Matrix_Translate(0.0f, -1.8f, 0.0f) 
+        model = Matrix_Translate(0.0f, -0.9f, 0.0f) 
             * Matrix_Scale(6.6f, 1.0f, 11.0f); 
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, WATER);
@@ -1889,18 +2065,28 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     float dx = xpos - g_LastCursorPosX;
     float dy = ypos - g_LastCursorPosY;
 
-    // DEFINIÇÃO DE SENSIBILIDADE: Altere aqui para ajustar a velocidade global
-    // O valor original era 0.01f (muito rápido). Mudamos para 0.002f.
+    // DEFINIÇÃO DE SENSIBILIDADE
     float sensibilidade = 0.002f;
 
-    if (g_LeftMouseButtonPressed)
+    // --- CORREÇÃO DO PULO DA CÂMERA ---
+    // Se o deslocamento for absurdamente grande (comum ao prender/soltar o mouse),
+    // nós ignoramos esse frame para a câmera não dar um tranco.
+    if (std::abs(dx) > 100.0f || std::abs(dy) > 100.0f) {
+        g_LastCursorPosX = xpos;
+        g_LastCursorPosY = ypos;
+        return;
+    }
+
+    // --- NOVA CONDIÇÃO DA CÂMERA ---
+    // Move a câmera se o botão esquerdo estiver pressionado OU se estiver em Primeira Pessoa
+    if (g_LeftMouseButtonPressed || !g_UseThirdPersonCamera)
     {
         // Atualizamos parâmetros da câmera com os deslocamentos atenuados
-        g_CameraTheta += sensibilidade * dx;
-        g_CameraPhi   += sensibilidade * dy;
+        g_CameraTheta -= sensibilidade * dx;
+        g_CameraPhi   -= sensibilidade * dy;
     
         // Trava para a câmera não dar uma cambalhota (manter entre -pi/2 e +pi/2)
-        float phimax = 3.141592f / 2.0f;
+        float phimax = 3.141592f / 2.0f - 0.01f; // Um leve desconto para evitar bugs numéricos
         float phimin = -phimax;
     
         if (g_CameraPhi > phimax) g_CameraPhi = phimax;
@@ -1922,7 +2108,6 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     }
 
     // ATENÇÃO: Atualizamos a última posição conhecida SEMPRE no final da função.
-    // Isso evita o bug da câmera "pular" quando você clica após arrastar o mouse solto.
     g_LastCursorPosX = xpos;
     g_LastCursorPosY = ypos;
 }
@@ -1956,7 +2141,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     Correcao_KeyCallback(key, action, mod);
     // =======================
 
-// Detecta se a tecla foi pressionada (PRESS) ou solta (RELEASE)
+    // Detecta se a tecla foi pressionada (PRESS) ou solta (RELEASE)
     bool isPressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
     if (action == GLFW_RELEASE) isPressed = false;
 
@@ -1965,7 +2150,32 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_A) g_A_Pressed = isPressed;
     if (key == GLFW_KEY_D) g_D_Pressed = isPressed;
 
+    // --- CAPTURA AUTOMÁTICA DO MOUSE NA PRIMEIRA PESSOA ---
+    if (key == GLFW_KEY_C && action == GLFW_PRESS)
+    {
+        // Se vamos SAIR da terceira pessoa e ENTRAR em primeira pessoa, salvamos tudo
+        if (g_UseThirdPersonCamera) {
+            g_SavedThirdPersonPosition = g_CameraPosition; 
+            g_SavedCameraTheta         = g_CameraTheta; // Salva o ângulo horizontal
+            g_SavedCameraPhi           = g_CameraPhi;   // Salva o ângulo vertical
+        }
 
+        // Alterna o booleano da câmera
+        g_UseThirdPersonCamera = !g_UseThirdPersonCamera;
+
+        if (!g_UseThirdPersonCamera) {
+            // Se entrou em Primeira Pessoa: Esconde e prende o cursor do mouse
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        } else {
+            // Se voltou para Terceira Pessoa: Libera o cursor normal...
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            
+            // ...e RESTAURA a posição e a direção exatas de antes!
+            g_CameraPosition = g_SavedThirdPersonPosition;
+            g_CameraTheta    = g_SavedCameraTheta;
+            g_CameraPhi      = g_SavedCameraPhi;
+        }
+    }
 
     // Se o usuário pressionar a tecla ESC, fechamos a janela.
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -2019,11 +2229,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_UsePerspectiveProjection = false;
     }
 
-    // Se o utilizador premir a tecla C, alterna o tipo de câmara
-    if (key == GLFW_KEY_C && action == GLFW_PRESS)
-    {
-        g_UseThirdPersonCamera = !g_UseThirdPersonCamera;
-    }
+    // --- O BLOCO DUPLICADO DA TECLA C QUE ESTAVA AQUI FOI REMOVIDO ---
 
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS)

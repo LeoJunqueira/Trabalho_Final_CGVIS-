@@ -58,6 +58,10 @@ uniform sampler2D TextureImage8;
 uniform sampler2D TextureImage9;
 uniform sampler2D TextureImage10;
 uniform sampler2D TextureImage11;
+uniform sampler2D TextureImage12;
+uniform sampler2D TextureImage13;
+uniform sampler2D TextureImage14;
+uniform sampler2D TextureImage15;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -99,7 +103,7 @@ void main()
     float alpha_output = 1.0;
 
     // -------------------------------------------------------------------------
-    // DEFINIÇÃO DE CORES, TEXTURAS E PROPRIEDADES DE MATERIAL
+    // DEFINIÇÃO DE CORES, TEXTURAS E PROPRIEDADES DE MATERIAL (CORRIGIDO)
     // -------------------------------------------------------------------------
     if ( object_id == SPHERE )
     {
@@ -113,7 +117,6 @@ void main()
         U = (theta + M_PI) / 2.0 / M_PI;
         V = (phi + M_PI_2) / M_PI;
 
-        // Propriedades do Vidro Fosco:
         alpha_output = 0.7; 
         Kd0 = vec3(0.9, 0.4, 0.1); 
         q = 8.0; 
@@ -141,54 +144,66 @@ void main()
     {
         U = texcoords.x;
         V = texcoords.y;
-        Kd0 = texture(TextureImage2, vec2(U,V)).rgb; 
+        Kd0 = texture(TextureImage2, vec2(U,V)).rgb; // Usa color_pallete.png
     }
-    else if ( object_id == CUBE || object_id == PILAR || object_id == PILAR_TOCHA )
+    else if (object_id == PILAR)
     {
         U = texcoords.x;
         V = texcoords.y;
-        Kd0 = texture(TextureImage5, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage15, vec2(U,V)).rgb; // Usa concreto.png
+    }
+    else if (object_id == PILAR_TOCHA)
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage14, vec2(U,V)).rgb; // Usa concreto.png
+    }
+    else if ( object_id == CUBE)
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage5, vec2(U,V)).rgb; // Usa concreto.png
+    }
+    else if ( object_id == RIPPER_ROO_BODY ) 
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage6, vec2(U,V)).rgb; // Usa Colores_diffuse.png
+        Ka = vec3(1.0, 1.0, 1.0); 
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.0, 0.0, 0.0); 
+        q = 1.0;
+    }
+    else if ( object_id == RIPPER_ROO_EYES ) 
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage7, vec2(U,V)).rgb; // Usa TexOjos_diffuse.png
+        Ka = vec3(1.0, 1.0, 1.0); 
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.0, 0.0, 0.0); 
+        q = 1.0;
+    }
+    else if ( object_id == AKU_AKU ) 
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage8, vec2(U,V)).rgb; // Usa lambert1_baseColor.png
+        Ka = vec3(0.2, 0.2, 0.2);
+        Kd = vec3(1.0, 1.0, 1.0);
+        Ks = vec3(0.1, 0.1, 0.1); 
+        q = 10.0;
     }
     else if ( object_id == CAIXA_EXPLOSIVA )
     {
         U = texcoords.x;
         V = texcoords.y;
-        Kd0 = texture(TextureImage4, vec2(U,V)).rgb;
+        Kd0 = texture(TextureImage12, vec2(U,V)).rgb; // CORRIGIDO: caixaTNT.png está no índice 12!
     }
     else if ( object_id == WATER )
     {
         Kd0 = vec3(0.0f, 0.4f, 0.6f); 
         alpha_output = 0.5;
-    }
-    else if ( object_id == RIPPER_ROO_BODY || object_id == 6 ) 
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        Kd0 = texture(TextureImage6, vec2(U,V)).rgb; 
-        Ka = vec3(1.0, 1.0, 1.0); 
-        Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.0, 0.0, 0.0); 
-        q = 1.0;
-    }
-    else if ( object_id == RIPPER_ROO_EYES || object_id == 7 ) 
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        Kd0 = texture(TextureImage7, vec2(U,V)).rgb; 
-        Ka = vec3(1.0, 1.0, 1.0); 
-        Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.0, 0.0, 0.0); 
-        q = 1.0;
-    }
-    else if ( object_id == AKU_AKU || object_id == 8 ) 
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        Kd0 = texture(TextureImage8, vec2(U,V)).rgb;
-        Ka = vec3(0.2, 0.2, 0.2);
-        Kd = vec3(1.0, 1.0, 1.0);
-        Ks = vec3(0.1, 0.1, 0.1); 
-        q = 10.0;
     }
 
     // Equação de Iluminação Direcional Global (Desativada a pedido)
