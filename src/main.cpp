@@ -243,7 +243,92 @@ float jump_force = 8.0f;
 bool is_jumping = false;
 float ground_level = -0.8f; // Altura do chão inicial do Crash
 float last_time = 0.0f;     // Para o delta_t
+// ------------------------------------------
+
 // ==========================================
+// MOTOR DE FÍSICA E COLISÃO (AABB)
+// ==========================================
+bool CheckAABBCollision(glm::vec3 minA, glm::vec3 maxA, glm::vec3 minB, glm::vec3 maxB) {
+    // Verifica sobreposição no eixo X
+    bool collisionX = maxA.x >= minB.x && minA.x <= maxB.x;
+    
+    // Verifica sobreposição no eixo Y
+    bool collisionY = maxA.y >= minB.y && minA.y <= maxB.y;
+    
+    // Verifica sobreposição no eixo Z
+    bool collisionZ = maxA.z >= minB.z && minA.z <= maxB.z;
+    
+    // Só há colisão real se estiverem se tocando nos 3 eixos simultaneamente
+    return collisionX && collisionY && collisionZ;
+}
+// ------------------------------------------
+
+// ==========================================
+// ANIMAÇÃO DINÂMICA DAS CAIXAS DE TNT (SINCRONIZADA)
+// ==========================================
+glm::vec3 CalculateBoxPosition(float current_time, float offset_time, float pos_x) {
+    float phase_duration = 4.0f; // 4 segundos por fase 
+    float total_cycle = 16.0f;   // 4 fases x 4s = 16s para o ciclo completo
+    
+    float t = fmod(current_time + offset_time, total_cycle);
+    int phase = (int)(t / phase_duration);
+    float phase_t = fmod(t, phase_duration);
+    
+    float water_y = -1.2f; 
+    
+    float z_start, z_end, y_start, y_end;
+    
+    if (phase == 0) { // Fase 0: Escondida lá no alto -> Fileira 1
+        z_start = -8.0f; z_end = -4.6f;
+        y_start = 12.0f; // Altura muito maior para nascer fora da tela!
+        y_end = water_y; 
+    } else if (phase == 1) { // Fase 1: Fileira 1 -> Fileira 2
+        z_start = -4.6f; z_end = 0.2f;
+        y_start = water_y; y_end = water_y;
+    } else if (phase == 2) { // Fase 2: Fileira 2 -> Fileira 3
+        z_start = 0.2f;  z_end = 5.0f;
+        y_start = water_y; y_end = water_y;
+    } else { // Fase 3: Fileira 3 -> Sai da tela pela frente
+        z_start = 5.0f;  z_end = 12.0f;     
+        y_start = water_y; y_end = water_y; 
+    }
+    
+    float z = z_start;
+    float y = y_start;
+    
+    if (phase == 0) {
+        // Na Cachoeira: Fica escondida lá em cima por 1s, cai nos 3s seguintes
+        if (phase_t > 1.0f) {
+            float progress = (phase_t - 1.0f) / 3.0f; // Progresso agora leva 3 segundos
+            
+            z = z_start + (z_end - z_start) * progress;
+            
+            // Mantemos a gravidade quadrática para o peso da queda
+            float gravity_fall = progress * progress; 
+            y = y_start + (y_end - y_start) * gravity_fall;
+        }
+    } else {
+        // No Rio: Mantém o compasso de esperar 2.5s e mover em 1.5s
+        if (phase_t > 2.5f) {
+            float progress = (phase_t - 2.5f) / 1.5f; 
+            z = z_start + (z_end - z_start) * progress;
+            y = y_start + (y_end - y_start) * progress;
+        }
+    }
+    
+    return glm::vec3(pos_x, y, z);
+}
+// ------------------------------------------
+
+// Estrutura para representar os obstáculos invisíveis no mundo
+struct BoundingBox {
+    glm::vec3 min;
+    glm::vec3 max;
+    std::string type; // Ex: "plataforma", "parede", "caixa_explosiva"
+};
+
+// Lista de todas as colisões do cenário
+std::vector<BoundingBox> world_collisions;
 
 int main(int argc, char* argv[])
 {
@@ -386,6 +471,49 @@ int main(int argc, char* argv[])
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+    // ==========================================
+    // INICIALIZAÇÃO DAS COLISÕES DO CENÁRIO
+    // ==========================================
+    // A escala padrão que o Isaac usou nas 9 plataformas de pedra
+    glm::vec3 plat_scale = glm::vec3(1.0f, 0.5f, 1.0f);
+
+    // Mapeamento exato das posições XYZ das matrizes de translação
+    std::vector<glm::vec3> platform_positions = {
+        glm::vec3( 0.0f, -1.2f,  0.2f), // Centro
+        glm::vec3( 0.0f, -1.2f, -4.6f), // Cima
+        glm::vec3( 0.0f, -1.2f,  5.0f), // Baixo
+        glm::vec3(-4.8f, -1.2f,  0.2f), // Esquerda
+        glm::vec3( 4.8f, -1.2f,  0.2f), // Direita
+        glm::vec3(-4.8f, -1.2f,  5.0f), // Diagonal Esq Baixo
+        glm::vec3( 4.8f, -1.2f,  5.0f), // Diagonal Dir Baixo
+        glm::vec3(-4.8f, -1.2f, -4.6f), // Diagonal Esq Cima
+        glm::vec3( 4.8f, -1.2f, -4.6f)  // Diagonal Dir Cima
+    };
+
+    for (glm::vec3 pos : platform_positions) {
+        BoundingBox box;
+        box.min = pos - plat_scale; // Canto inferior traseiro esquerdo
+        box.max = pos + plat_scale; // Canto superior frontal direito
+        box.type = "plataforma";
+        world_collisions.push_back(box);
+    }
+
+    // ==========================================
+    // IA E FÍSICA DO RIPPER ROO
+    // ==========================================
+    // Rota de pulos: Índices do vetor platform_positions (0 a 8)
+    // Ele vai pular: Centro -> Dir -> Diag Dir Cima -> Cima -> Diag Esq Cima -> Esq...
+    std::vector<int> ripper_path = {0, 4, 8, 1, 7, 3, 5, 2, 6};
+    int ripper_path_index = 0;
+
+    float ripper_timer = 0.0f;
+    float ripper_jump_duration = 0.8f; // Tempo dele no ar (rápido!)
+    float ripper_wait_duration = 0.4f; // Tempo que ele fica parado antes de pular
+
+    // Posição inicial no mundo
+    glm::vec3 ripper_pos = glm::vec3(0.0f, -0.7f, 0.2f);
+    //-------------------------------------------
+
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -396,21 +524,109 @@ int main(int argc, char* argv[])
         float delta_t = current_time - last_time;
         last_time = current_time;
 
-        // Comando de Pulo (Barra de Espaço)
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !is_jumping) {
-            crash_velocity_y = jump_force;
-            is_jumping = true;
-        }
-
-        // Aplica a gravidade e atualiza a posição
+        // ------------------------------------------
+        // COLISÃO DO CRASH (FÍSICA CORRIGIDA)
+        // ------------------------------------------
+        
+        // 1. PRIMEIRO aplicamos a gravidade e o movimento vertical (Prevê o futuro)
         crash_velocity_y += gravity * delta_t;
         crash_position.y += crash_velocity_y * delta_t;
 
-        // Colisão com o chão
-        if (crash_position.y <= ground_level) {
-            crash_position.y = ground_level;
+        // 2. DEPOIS construímos a Bounding Box (Hitbox) do Crash na nova posição
+        // Agora definimos que o crash_position.y é exatamente o CHÃO do pé dele
+        glm::vec3 crash_fat = glm::vec3(0.3f, 0.8f, 0.3f); 
+        BoundingBox crash_box;
+        crash_box.min = glm::vec3(crash_position.x - crash_fat.x, crash_position.y, crash_position.z - crash_fat.z); // Pé
+        crash_box.max = glm::vec3(crash_position.x + crash_fat.x, crash_position.y + crash_fat.y, crash_position.z + crash_fat.z); // Cabeça
+
+        bool is_grounded = false;
+
+        // --- ATUALIZAÇÃO DAS CAIXAS DINÂMICAS NESTE FRAME ---
+        std::vector<BoundingBox> current_frame_collisions = world_collisions; // Copia as plataformas fixas
+        
+        // Coordenadas X das trilhas da água
+        float left_track_x = -2.4f;
+        float right_track_x = 2.4f;
+        
+        // Caixas injetadas com compasso de 4 segundos
+        std::vector<glm::vec3> active_boxes = {
+            CalculateBoxPosition(current_time, 0.0f, left_track_x),  // Esquerda 1
+            CalculateBoxPosition(current_time, 8.0f, left_track_x),  // Esquerda 2 (Meia volta de atraso)
+            CalculateBoxPosition(current_time, 4.0f, right_track_x), // Direita 1 (1 Fase de atraso)
+            CalculateBoxPosition(current_time, 12.0f, right_track_x) // Direita 2 (3 Fases de atraso)
+        };
+
+        // Adicionamos a "Hitbox" de cada caixa na física do jogo
+        glm::vec3 tnt_scale = glm::vec3(0.7f, 0.7f, 0.7f); // O mesmo scale usado no Matrix_Scale do Isaac
+        for (glm::vec3 box_pos : active_boxes) {
+            BoundingBox tnt_box;
+            tnt_box.min = box_pos - tnt_scale;
+            tnt_box.max = box_pos + tnt_scale;
+            tnt_box.type = "tnt";
+            current_frame_collisions.push_back(tnt_box);
+        }
+
+        // 3. Verifica se essa nova posição atravessou alguma plataforma de pedra
+        for (BoundingBox& plat : current_frame_collisions) {
+            if (CheckAABBCollision(crash_box.min, crash_box.max, plat.min, plat.max)) {
+                // Se bateu na plataforma e a velocidade estava puxando para baixo (caindo)...
+                if (crash_velocity_y <= 0.0f) {
+                    crash_position.y = plat.max.y; // Crava a bota do Crash EXATAMENTE no topo do .obj da pedra
+                    crash_velocity_y = 0.0f;       // Zera o impacto da queda
+                    is_grounded = true;
+                    break; // Já achou o chão, não precisa testar os outros cubos
+                }
+            }
+        }
+
+        // 4. Comando de Pulo (Só funciona se estiver com o pé firme na pedra)
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && is_grounded) {
+            crash_velocity_y = jump_force;
+        }
+
+        // 5. CAIU NA ÁGUA! (Game Over e Respawn)
+        if (crash_position.y < -3.0f) {
+            crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); // Cai do céu no centro
             crash_velocity_y = 0.0f;
-            is_jumping = false;
+        }
+        // ------------------------------------------
+
+        // ------------------------------------------
+        // IA DO RIPPER ROO (COMPORTAMENTO)
+        // ------------------------------------------
+        ripper_timer += delta_t;
+        float total_state_time = ripper_jump_duration + ripper_wait_duration;
+        
+        // Descobre de onde ele sai e para onde ele vai
+        int current_node = ripper_path[ripper_path_index];
+        int next_node = ripper_path[(ripper_path_index + 1) % ripper_path.size()];
+        
+        // Pega as posições X e Z das plataformas do cenário
+        glm::vec3 start_pos = platform_positions[current_node];
+        glm::vec3 end_pos = platform_positions[next_node];
+        
+        // Ajusta o Y para o topo exato da plataforma de pedra
+        start_pos.y = -0.7f; 
+        end_pos.y = -0.7f;   
+        
+        if (ripper_timer <= ripper_wait_duration) {
+            // ESTADO 1: Parado no chão (Preparando o pulo)
+            ripper_pos = start_pos;
+        } else if (ripper_timer <= total_state_time) {
+            // ESTADO 2: Voando no ar (Interpolação)
+            float jump_progress = (ripper_timer - ripper_wait_duration) / ripper_jump_duration;
+            
+            // Movimenta no plano (X e Z)
+            ripper_pos.x = glm::mix(start_pos.x, end_pos.x, jump_progress);
+            ripper_pos.z = glm::mix(start_pos.z, end_pos.z, jump_progress);
+            
+            // Movimenta a altura (A famosa Parábola do pulo)
+            float jump_arc = 1.0f - pow(2.0f * jump_progress - 1.0f, 2.0f);
+            ripper_pos.y = start_pos.y + (jump_arc * 3.0f); // Ele atinge 3.0 de altura no meio do pulo!
+        } else {
+            // ESTADO 3: Aterrissou! (Avança para a próxima plataforma e reseta a mente)
+            ripper_timer = 0.0f;
+            ripper_path_index = (ripper_path_index + 1) % ripper_path.size();
         }
         // ------------------------------------------
 
@@ -843,35 +1059,44 @@ int main(int argc, char* argv[])
 
 //-------------------------------------------------------------------------------------------------------------------
 
-        //CAIXA EXPLOSIVA   
-        model = Matrix_Translate(-2.4f, -1.0f, 0.0f) *
-                            Matrix_Scale(0.7f, 0.7f, 0.7f);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, CAIXA_EXPLOSIVA);
-        DrawVirtualObject("the_cube");
+        // CAIXAS EXPLOSIVAS DINÂMICAS
+        for (glm::vec3 box_pos : active_boxes) {
+            // Só desenha se a caixa não estiver "escondida" no fundo da água
+            if (box_pos.y > -5.0f) {
+                model = Matrix_Translate(box_pos.x, box_pos.y, box_pos.z) *
+                        Matrix_Scale(0.7f, 0.7f, 0.7f);
+                
+                glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, CAIXA_EXPLOSIVA);
+                DrawVirtualObject("the_cube"); // Certifique-se de que o objeto CAIXA_EXPLOSIVA está carregado corretamente no seu .obj
+            }
+        }
 // ----------------------------------------------------------------------------------
 
+        // ----------------------------------------------------------------------------------
+        // MODELO DO RIPPER ROO (COM CORREÇÃO DE PIVÔ)
+        // ----------------------------------------------------------------------------------
+        // A modelagem original do Ripper Roo vinha com quatro modelos distintos lado a lado.
+        // O modelo que foi escolhido não estava na centro, logo o pivô dele fica um pouco deslocado.
+        float offset_x = 2.7f;  // Ajuste de posição se ele estiver caindo muito para direita ou para esquerda
+        float offset_y = 0.0f;  // A altura já foi configurada no motor da IA
+        float offset_z = 0.0f;  // Ajuste de posição se ele estiver caindo muito para frente ou para trás
 
-        //MODELO DO RIPPER ROO
-        model = Matrix_Translate(-2.0f, -0.8f, 0.5f) * Matrix_Scale(0.09f, 0.09f, 0.09f);
+        // Somamos o offset apenas na hora de renderizar a imagem
+        model = Matrix_Translate(ripper_pos.x + offset_x, 
+                                 ripper_pos.y + offset_y, 
+                                 ripper_pos.z + offset_z) 
+              * Matrix_Scale(0.09f, 0.09f, 0.09f);
+        
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
 
         // Corpo do Ripper Roo
         glUniform1i(g_object_id_uniform, RIPPER_ROO_BODY);
         DrawVirtualObject("RipperRoo_Colores_0"); 
 
-        // Olhos do Ripper Roo (reaproveitando a matriz model acima)
+        // Olhos do Ripper Roo
         glUniform1i(g_object_id_uniform, RIPPER_ROO_EYES);
         DrawVirtualObject("RipperRoo_TexOjos_0");
-
-
-        //MODELO DO AKU AKU
-        model = Matrix_Translate(2.0f, 0.5f, 0.0f) * Matrix_Scale(5.0f, 5.0f, 5.0f);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-
-        glUniform1i(g_object_id_uniform, AKU_AKU);
-        DrawVirtualObject("pasted__pCylinder7_lambert1_0");
-
 
 // ----------------------------------------------------------------------------------
         //  ÁGUA (DEVE SER O ÚLTIMO OBJETO A SER DESENHADO!)
