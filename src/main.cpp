@@ -244,8 +244,8 @@ GLuint g_NumLoadedTextures = 0;
 // ==========================================
 glm::vec4 crash_position = glm::vec4(0.0f, -0.8f, 0.0f, 1.0f); // Começa em Y = -0.8f
 float crash_velocity_y = 0.0f;
-float gravity = -18.0f;
-float jump_force = 8.0f;
+float gravity = -25.0f;
+float jump_force = 12.0f;
 bool is_jumping = false;
 float ground_level = -0.8f; // Altura do chão inicial do Crash
 float last_time = 0.0f;     // Para o delta_t
@@ -323,6 +323,25 @@ glm::vec3 CalculateBoxPosition(float current_time, float offset_time, float pos_
     }
     
     return glm::vec3(pos_x, y, z);
+}
+// ------------------------------------------
+
+// ==========================================
+// MATEMÁTICA DA CURVA DE BÉZIER CÚBICA (AKU AKU)
+// ==========================================
+glm::vec3 CalculateBezierCubic(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) {
+    float u = 1.0f - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+
+    glm::vec3 p = uuu * p0;
+    p += 3.0f * uu * t * p1;
+    p += 3.0f * u * tt * p2;
+    p += ttt * p3;
+
+    return p;
 }
 // ------------------------------------------
 
@@ -745,6 +764,22 @@ int main(int argc, char* argv[])
             crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f);
             crash_velocity_y = 0.0f;
         }
+
+        // ------------------------------------------
+        // ANIMAÇÃO DO AKU AKU (Curva de Bézier Cúbica)
+        // ------------------------------------------
+        float bezier_speed = 3.0f; 
+        float bezier_t = (sin(current_time * bezier_speed) + 1.0f) / 2.0f; 
+
+        glm::vec3 p0 = glm::vec3(-1.2f,  0.5f,  0.5f);
+        glm::vec3 p1 = glm::vec3(-1.8f,  0.0f, -1.0f);
+        glm::vec3 p2 = glm::vec3( 1.8f,  0.0f, -1.0f);
+        glm::vec3 p3 = glm::vec3( 1.2f,  0.5f,  0.5f);
+
+        glm::vec3 aku_base_pos = glm::vec3(crash_position.x, crash_position.y + 1.6f, crash_position.z);
+        glm::vec3 aku_offset = CalculateBezierCubic(p0, p1, p2, p3, bezier_t);
+        glm::vec3 aku_pos = aku_base_pos + aku_offset;
+        // ------------------------------------------
 
         // Aqui executamos as operações de renderização
 
@@ -1259,7 +1294,7 @@ int main(int argc, char* argv[])
         }
 // ----------------------------------------------------------------------------------
 
-       // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
         // MODELO DO RIPPER ROO (ORDEM CORRETA DE MATRIZES)
         // ------------------------------------------------------------------
         float offset_x = 2.7f;  
@@ -1281,6 +1316,21 @@ int main(int argc, char* argv[])
         // Olhos do Ripper Roo
         glUniform1i(g_object_id_uniform, RIPPER_ROO_EYES);
         DrawVirtualObject("RipperRoo_TexOjos_0");
+        // ------------------------------------------------------------------
+
+        // ----------------------------------------------------------------------------------
+        // MODELO DO AKU AKU (Máscara Flutuante)
+        // ----------------------------------------------------------------------------------
+        float aku_scale = 3.0f; 
+        
+        model = Matrix_Translate(aku_pos.x, aku_pos.y, aku_pos.z) 
+              * Matrix_Rotate_Y(crash_rotation_angle)
+              * Matrix_Scale(aku_scale, aku_scale, aku_scale);
+        
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, AKU_AKU);
+        
+        DrawVirtualObject("pasted__pCylinder7_lambert1_0");
 
 // ----------------------------------------------------------------------------------
         //  ÁGUA (DEVE SER O ÚLTIMO OBJETO A SER DESENHADO!)
