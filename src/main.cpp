@@ -414,7 +414,6 @@ int main(int argc, char* argv[])
 
     // Carregamos os shaders de vértices e de fragmentos que serão utilizados
     // para renderização. Veja slides 180-200 do documento Aula_03_Rendering_Pipeline_Grafico.pdf.
-    //
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
