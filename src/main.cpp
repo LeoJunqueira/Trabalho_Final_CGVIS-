@@ -1473,25 +1473,63 @@ int main(int argc, char* argv[])
         // =====================================================================
         // RENDERIZAÇÃO DA INTERFACE (HUD)
         // =====================================================================
+        // Pegamos a largura base de uma letra na tela atual para poder centralizar
+        float char_w = TextRendering_CharWidth(window);
+
         if (current_state == MENU) {
-            TextRendering_PrintString(window, "CRASH BANDICOOT: RIPPER ROO", -0.5f, 0.2f, 4.0f);
-            TextRendering_PrintString(window, "Pressione ENTER para iniciar", -0.4f, -0.2f, 2.0f);
+            std::string titulo = "CRASH BANDICOOT: RIPPER ROO";
+            float scale_t = 4.0f; // Tamanho original que você definiu
+            float x_t = 0.0f - ((titulo.length() * char_w * scale_t) / 2.0f); // Centraliza matematicamente
+            
+            // Falso Negrito (Sombra)
+            TextRendering_PrintString(window, titulo, x_t + 0.005f, 0.2f - 0.01f, scale_t);
+            // Texto Principal
+            TextRendering_PrintString(window, titulo, x_t, 0.2f, scale_t);
+
+            std::string sub = "Pressione ENTER para iniciar";
+            float scale_s = 2.0f; // Tamanho original que você definiu
+            float x_s = 0.0f - ((sub.length() * char_w * scale_s) / 2.0f);
+            TextRendering_PrintString(window, sub, x_s, -0.2f, scale_s);
         } 
         else if (current_state == PLAYING) {
             char hp_buffer[64];
+            
+            // HUD do Crash (Fica alinhado à esquerda)
             snprintf(hp_buffer, sizeof(hp_buffer), "Crash HP: %d", crash_hp);
-            TextRendering_PrintString(window, hp_buffer, -0.9f, 0.9f, 2.0f);
+            TextRendering_PrintString(window, hp_buffer, -0.95f, 0.9f, 2.0f);
 
+            // HUD do Ripper Roo (Fica cravado no canto direito)
             snprintf(hp_buffer, sizeof(hp_buffer), "Ripper Roo HP: %d", ripper_hp);
-            TextRendering_PrintString(window, hp_buffer, 0.4f, 0.9f, 2.0f);
+            std::string ripper_str = hp_buffer;
+            float scale_r = 2.0f;
+            float x_r = 0.95f - (ripper_str.length() * char_w * scale_r); 
+            TextRendering_PrintString(window, ripper_str, x_r, 0.9f, scale_r);
         } 
         else if (current_state == GAME_OVER) {
-            TextRendering_PrintString(window, "GAME OVER", -0.25f, 0.2f, 4.0f);
-            TextRendering_PrintString(window, "Pressione ENTER para tentar novamente", -0.55f, -0.2f, 2.0f);
+            std::string titulo = "GAME OVER";
+            float scale_t = 4.0f; 
+            float x_t = 0.0f - ((titulo.length() * char_w * scale_t) / 2.0f);
+            
+            TextRendering_PrintString(window, titulo, x_t + 0.005f, 0.2f - 0.01f, scale_t);
+            TextRendering_PrintString(window, titulo, x_t, 0.2f, scale_t);
+
+            std::string sub = "Pressione ENTER para tentar novamente";
+            float scale_s = 2.0f;
+            float x_s = 0.0f - ((sub.length() * char_w * scale_s) / 2.0f);
+            TextRendering_PrintString(window, sub, x_s, -0.2f, scale_s);
         } 
         else if (current_state == VICTORY) {
-            TextRendering_PrintString(window, "YOU WIN!", -0.2f, 0.2f, 4.0f);
-            TextRendering_PrintString(window, "Pressione ENTER para jogar novamente", -0.55f, -0.2f, 2.0f);
+            std::string titulo = "YOU WIN!";
+            float scale_t = 4.0f; 
+            float x_t = 0.0f - ((titulo.length() * char_w * scale_t) / 2.0f);
+            
+            TextRendering_PrintString(window, titulo, x_t + 0.005f, 0.2f - 0.01f, scale_t);
+            TextRendering_PrintString(window, titulo, x_t, 0.2f, scale_t);
+
+            std::string sub = "Pressione ENTER para jogar novamente";
+            float scale_s = 2.0f;
+            float x_s = 0.0f - ((sub.length() * char_w * scale_s) / 2.0f);
+            TextRendering_PrintString(window, sub, x_s, -0.2f, scale_s);
         }
         // ------------------------------------------
 
