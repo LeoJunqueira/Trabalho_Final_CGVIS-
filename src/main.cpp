@@ -270,6 +270,18 @@ bool CheckAABBCollision(glm::vec3 minA, glm::vec3 maxA, glm::vec3 minB, glm::vec
 // ------------------------------------------
 
 // ==========================================
+// MÁQUINA DE ESTADOS E STATUS DOS PERSONAGENS
+// ==========================================
+enum GameState { MENU, PLAYING, GAME_OVER, VICTORY };
+GameState current_state = MENU;
+
+int crash_hp = 3;
+int ripper_hp = 3;
+float crash_invulnerability_time = 0.0f;
+float ripper_invulnerability_time = 0.0f;
+// ------------------------------------------
+
+// ==========================================
 // ANIMAÇÃO DINÂMICA DAS CAIXAS DE TNT (SINCRONIZADA)
 // ==========================================
 glm::vec3 CalculateBoxPosition(float current_time, float offset_time, float pos_x) {
@@ -362,6 +374,36 @@ std::vector<BoundingBox> world_collisions;
 bool caixa_atingida[4] = {false, false, false, false};
 float tempo_hit_caixa[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 bool caixa_destruida[4] = {false, false, false, false};
+
+// ==========================================
+// VARIÁVEIS GLOBAIS DE CENÁRIO E IA
+// ==========================================
+// Mapeamento exato das posições XYZ das matrizes de translação
+std::vector<glm::vec3> platform_positions = {
+    glm::vec3( 0.0f, -1.2f,  0.2f), // Centro
+    glm::vec3( 0.0f, -1.2f, -4.6f), // Cima
+    glm::vec3( 0.0f, -1.2f,  5.0f), // Baixo
+    glm::vec3(-4.8f, -1.2f,  0.2f), // Esquerda
+    glm::vec3( 4.8f, -1.2f,  0.2f), // Direita
+    glm::vec3(-4.8f, -1.2f,  5.0f), // Diagonal Esq Baixo
+    glm::vec3( 4.8f, -1.2f,  5.0f), // Diagonal Dir Baixo
+    glm::vec3(-4.8f, -1.2f, -4.6f), // Diagonal Esq Cima
+    glm::vec3( 4.8f, -1.2f, -4.6f)  // Diagonal Dir Cima
+};
+
+// ==========================================
+// IA E FÍSICA DO RIPPER ROO
+// ==========================================
+// Rota de pulos: Índices do vetor platform_positions (0 a 8)
+// Ele vai pular: Centro -> Dir -> Diag Dir Cima -> Cima -> Diag Esq Cima -> Esq...
+std::vector<int> ripper_path = {0, 4, 8, 1, 7, 3, 5, 2, 6};
+int ripper_path_index = 0;
+float ripper_timer = 0.0f;
+float ripper_jump_duration = 0.8f; // Tempo dele no ar (rápido!)
+float ripper_wait_duration = 0.4f; // Tempo que ele fica parado antes de pular
+// Posição inicial no mundo
+glm::vec3 ripper_pos = glm::vec3(0.0f, -0.7f, 0.2f);
+// ------------------------------------------
 
 int main(int argc, char* argv[])
 {
@@ -513,19 +555,6 @@ int main(int argc, char* argv[])
     // A escala padrão que o Isasc usou nas 9 plataformas de pedra
     glm::vec3 plat_scale = glm::vec3(1.0f, 0.5f, 1.0f);
 
-    // Mapeamento exato das posições XYZ das matrizes de translação
-    std::vector<glm::vec3> platform_positions = {
-        glm::vec3( 0.0f, -1.2f,  0.2f), // Centro
-        glm::vec3( 0.0f, -1.2f, -4.6f), // Cima
-        glm::vec3( 0.0f, -1.2f,  5.0f), // Baixo
-        glm::vec3(-4.8f, -1.2f,  0.2f), // Esquerda
-        glm::vec3( 4.8f, -1.2f,  0.2f), // Direita
-        glm::vec3(-4.8f, -1.2f,  5.0f), // Diagonal Esq Baixo
-        glm::vec3( 4.8f, -1.2f,  5.0f), // Diagonal Dir Baixo
-        glm::vec3(-4.8f, -1.2f, -4.6f), // Diagonal Esq Cima
-        glm::vec3( 4.8f, -1.2f, -4.6f)  // Diagonal Dir Cima
-    };
-
     for (glm::vec3 pos : platform_positions) {
         BoundingBox box;
         box.min = pos - plat_scale; // Canto inferior traseiro esquerdo
@@ -534,25 +563,16 @@ int main(int argc, char* argv[])
         world_collisions.push_back(box);
     }
 
-    // ==========================================
-    // IA E FÍSICA DO RIPPER ROO
-    // ==========================================
-    // Rota de pulos: Índices do vetor platform_positions (0 a 8)
-    // Ele vai pular: Centro -> Dir -> Diag Dir Cima -> Cima -> Diag Esq Cima -> Esq...
-    std::vector<int> ripper_path = {0, 4, 8, 1, 7, 3, 5, 2, 6};
-    int ripper_path_index = 0;
 
-    float ripper_timer = 0.0f;
-    float ripper_jump_duration = 0.8f; // Tempo dele no ar (rápido!)
-    float ripper_wait_duration = 0.4f; // Tempo que ele fica parado antes de pular
-
-    // Posição inicial no mundo
-    glm::vec3 ripper_pos = glm::vec3(0.0f, -0.7f, 0.2f);
     //-------------------------------------------
 
     float crash_rotation_angle = 0.0f;
     float ripper_rotation_angle = 0.0f;
     float g_CrashJumpSpinAngle = 0.0f; // Ângulo de rotação extra para o pulo
+
+    // Variáveis de renderização contínua (existem fora do congelamento da física)
+    std::vector<glm::vec3> active_boxes(4, glm::vec3(0.0f, -10.0f, 0.0f)); 
+    glm::vec3 aku_pos = glm::vec3(0.0f, -10.0f, 0.0f);
 
 //=======================================================================================================
 //============================ LOOP PRINCIPAL DO GAME ===================================================
@@ -567,220 +587,329 @@ int main(int argc, char* argv[])
         float delta_t = current_time - last_time;
         last_time = current_time;
 
+        // =====================================================================
+        // 1. SISTEMA DE CÂMERAS (Aberta/Livre e 1ª Pessoa)
+        // =====================================================================
+        float cam_y = sin(g_CameraPhi);
+        float cam_z = cos(g_CameraPhi) * cos(g_CameraTheta);
+        float cam_x = cos(g_CameraPhi) * sin(g_CameraTheta);
+
+        // Vetor de visão (Para onde o mouse aponta)
+        glm::vec4 camera_look_dir = glm::normalize(glm::vec4(cam_x, cam_y, cam_z, 0.0f)); 
+        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
+
+        // Vetor lateral (Para a câmera poder andar de lado nas setas)
+        glm::vec3 view_3 = glm::vec3(camera_look_dir.x, camera_look_dir.y, camera_look_dir.z);
+        glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, glm::vec3(0.0f, 1.0f, 0.0f))), 0.0f);
         // ------------------------------------------
-        // COLISÃO DO CRASH (FÍSICA CORRIGIDA)
-        // ------------------------------------------
-        
-        // 1. PRIMEIRO aplicamos a gravidade e o movimento vertical (Prevê o futuro)
-        crash_velocity_y += gravity * delta_t;
-        crash_position.y += crash_velocity_y * delta_t;
 
-        // 2. DEPOIS construímos a Bounding Box (Hitbox) do Crash na nova posição
-        // Agora definimos que o crash_position.y é exatamente o CHÃO do pé dele
-        glm::vec3 crash_fat = glm::vec3(0.3f, 0.8f, 0.3f); 
-        BoundingBox crash_box;
-        crash_box.min = glm::vec3(crash_position.x - crash_fat.x, crash_position.y, crash_position.z - crash_fat.z); // Pé
-        crash_box.max = glm::vec3(crash_position.x + crash_fat.x, crash_position.y + crash_fat.y, crash_position.z + crash_fat.z); // Cabeça
+        // ==========================================================
+        // O CONGELAMENTO DA FÍSICA E INPUTS
+        // ==========================================================
+        if (current_state == PLAYING) 
+        {
+            // Diminui os cronômetros de invencibilidade a cada frame
+            if (crash_invulnerability_time > 0.0f) crash_invulnerability_time -= delta_t;
+            if (ripper_invulnerability_time > 0.0f) ripper_invulnerability_time -= delta_t;
 
-        bool is_grounded = false;
+            // ------------------------------------------
+            // COLISÃO DO CRASH (FÍSICA CORRIGIDA)
+            // ------------------------------------------            
+            // 1. PRIMEIRO aplicamos a gravidade e o movimento vertical (Prevê o futuro)
+            crash_velocity_y += gravity * delta_t;
+            crash_position.y += crash_velocity_y * delta_t;
 
-  // --- ATUALIZAÇÃO DAS CAIXAS DINÂMICAS NESTE FRAME ---
-        std::vector<BoundingBox> current_frame_collisions = world_collisions; // Copia as plataformas fixas
-        
-        // Coordenadas X das trilhas da água
-        float left_track_x = -2.4f;
-        float right_track_x = 2.4f;
-        
-        // Caixas injetadas com compasso de 4 segundos
-        std::vector<glm::vec3> active_boxes = {
-            CalculateBoxPosition(current_time, 0.0f, left_track_x),  // Esquerda 1
-            CalculateBoxPosition(current_time, 8.0f, left_track_x),  // Esquerda 2 (Meia volta de atraso)
-            CalculateBoxPosition(current_time, 4.0f, right_track_x), // Direita 1 (1 Fase de atraso)
-            CalculateBoxPosition(current_time, 12.0f, right_track_x) // Direita 2 (3 Fases de atraso)
-        };
+            // 2. DEPOIS construímos a Bounding Box (Hitbox) do Crash na nova posição
+            // Agora definimos que o crash_position.y é exatamente o CHÃO do pé dele
+            glm::vec3 crash_fat = glm::vec3(0.3f, 0.8f, 0.3f); 
+            BoundingBox crash_box;
+            crash_box.min = glm::vec3(crash_position.x - crash_fat.x, crash_position.y, crash_position.z - crash_fat.z); // Pé
+            crash_box.max = glm::vec3(crash_position.x + crash_fat.x, crash_position.y + crash_fat.y, crash_position.z + crash_fat.z); // Cabeça
 
-        // =========================================================================
-        // Lógica de tempo das caixas (sumir, explodir lateralmente e resetar respawn)
-        // =========================================================================
-        for (int i = 0; i < 4; i++) {
-            // Se a caixa foi atingida e ACABOU de passar 3 segundos (e ainda não estava marcada como destruída)
-            if (caixa_atingida[i] && !caixa_destruida[i] && (current_time - tempo_hit_caixa[i] >= 3.0f)) {
-                
-                // --- NOVA LÓGICA DE EXPLOSÃO LATERAL ---
-                glm::vec3 box_pos = active_boxes[i];
-                glm::vec3 crash_xyz = glm::vec3(crash_position.x, crash_position.y, crash_position.z);
+            bool is_grounded = false;
 
-                // 1. Verifica se o Crash está na mesma "linha" (proximidade no eixo Z)
-                // Usamos uma margem de 1.8 metros para cobrir a largura da plataforma lateral
-                if (std::abs(crash_xyz.z - box_pos.z) < 1.8f) {
+    // --- ATUALIZAÇÃO DAS CAIXAS DINÂMICAS NESTE FRAME ---
+            std::vector<BoundingBox> current_frame_collisions = world_collisions; // Copia as plataformas fixas
+            
+            // Coordenadas X das trilhas da água
+            float left_track_x = -2.4f;
+            float right_track_x = 2.4f;
+            
+            // Caixas injetadas com compasso de 4 segundos
+            active_boxes = {
+                CalculateBoxPosition(current_time, 0.0f, left_track_x),  // Esquerda 1
+                CalculateBoxPosition(current_time, 8.0f, left_track_x),  // Esquerda 2 (Meia volta de atraso)
+                CalculateBoxPosition(current_time, 4.0f, right_track_x), // Direita 1 (1 Fase de atraso)
+                CalculateBoxPosition(current_time, 12.0f, right_track_x) // Direita 2 (3 Fases de atraso)
+            };
+
+            // =========================================================================
+            // Lógica de tempo das caixas (sumir, explodir lateralmente e resetar respawn)
+            // =========================================================================
+            for (int i = 0; i < 4; i++) {
+                // Se a caixa foi atingida e ACABOU de passar 3 segundos (e ainda não estava marcada como destruída)
+                if (caixa_atingida[i] && !caixa_destruida[i] && (current_time - tempo_hit_caixa[i] >= 3.0f)) {
                     
-                    // 2. Se a caixa explodiu na Esquerda (X < 0) e o Crash está na plataforma da Esquerda (X < 0)...
-                    // Ou se a caixa explodiu na Direita (X > 0) e o Crash está na plataforma da Direita (X > 0)...
-                    if ((box_pos.x < 0.0f && crash_xyz.x < 0.0f) || 
-                        (box_pos.x > 0.0f && crash_xyz.x > 0.0f)) {
+                    // --- NOVA LÓGICA DE EXPLOSÃO LATERAL ---
+                    glm::vec3 box_pos = active_boxes[i];
+                    glm::vec3 crash_xyz = glm::vec3(crash_position.x, crash_position.y, crash_position.z);
+
+                    // 1. Verifica se o Crash está na mesma "linha" (proximidade no eixo Z)
+                    // Usamos uma margem de 1.8 metros para cobrir a largura da plataforma lateral
+                    if (std::abs(crash_xyz.z - box_pos.z) < 1.8f) {
                         
-                        // O Crash foi pego pela onda de choque na lateral! Respawn
-                        crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); 
-                        crash_velocity_y = 0.0f;
-                    }
-                }
-
-                // Desativa a caixa definitivamente neste ciclo
-                caixa_destruida[i] = true;
-
-                // --- O RIPPER ROO TAMBÉM MORRE COM A EXPLOSÃO ---
-                // Se o Ripper Roo estiver perto o suficiente da caixa quando ela explodir
-                // (distância equivalente ao tamanho de uma plataforma), ele "morre":
-                // volta para a posição inicial e reinicia a rota de pulos.
-                glm::vec3 ripper_xyz = ripper_pos;
-                float ripper_explosion_radius = 5.0f; // Largura de uma plataforma (plat_scale.x * 2)
-                if (glm::length(ripper_xyz - box_pos) < ripper_explosion_radius) {
-                    ripper_path_index = 0;
-                    ripper_timer = 0.0f;
-                    ripper_pos = platform_positions[ripper_path[0]];
-                    ripper_pos.y = -0.7f;
-                }
-            }
-
-            // Se a caixa completou a volta e está voltando para o topo da cachoeira (Y alto), reseta!
-            if (active_boxes[i].y > 10.0f) {
-                caixa_atingida[i] = false;
-                caixa_destruida[i] = false;
-            }
-        }
-
-        // Adicionamos a "Hitbox" de cada caixa na física do jogo (se não estiver destruída)
-        glm::vec3 tnt_scale = glm::vec3(0.9f, 0.9f, 0.7f); 
-        for (int i = 0; i < 4; i++) {
-            if (!caixa_destruida[i]) {
-                BoundingBox tnt_box;
-                tnt_box.min = active_boxes[i] - tnt_scale;
-                tnt_box.max = active_boxes[i] + tnt_scale;
-                tnt_box.type = "tnt";
-                tnt_box.id = i; // Guarda o ID da caixa (0 a 3)
-                current_frame_collisions.push_back(tnt_box);
-            }
-        }
-
-        // =========================================================================
-        //  Verifica se essa nova posição atravessou alguma plataforma ou caixa
-        // =========================================================================
-        for (BoundingBox& plat : current_frame_collisions) {
-            if (CheckAABBCollision(crash_box.min, crash_box.max, plat.min, plat.max)) {
-                // Se bateu na plataforma e a velocidade estava puxando para baixo (caindo)...
-                if (crash_velocity_y <= 0.0f) {
-                    crash_position.y = plat.max.y; // Crava a bota do Crash no topo
-                    crash_velocity_y = 0.0f;       // Zera o impacto da queda
-                    is_grounded = true;
-                    
-                    // Se o chão que ele pisou for uma caixa TNT ativa o cronômetro
-                    if (plat.type == "tnt" && plat.id >= 0) {
-                        if (!caixa_atingida[plat.id]) { 
-                            caixa_atingida[plat.id] = true;
-                            tempo_hit_caixa[plat.id] = current_time;
+                        // 2. Se a caixa explodiu na Esquerda (X < 0) e o Crash está na plataforma da Esquerda (X < 0)...
+                        // Ou se a caixa explodiu na Direita (X > 0) e o Crash está na plataforma da Direita (X > 0)...
+                        if ((box_pos.x < 0.0f && crash_xyz.x < 0.0f) || 
+                            (box_pos.x > 0.0f && crash_xyz.x > 0.0f)) {
+                            
+                            // O Crash foi pego pela onda de choque na lateral! Respawn
+                            crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); 
+                            crash_velocity_y = 0.0f;
                         }
                     }
-                    break; // Já achou o chão, sai do loop
+
+                    // Desativa a caixa definitivamente neste ciclo
+                    caixa_destruida[i] = true;
+
+                    // --- O RIPPER ROO TAMBÉM MORRE COM A EXPLOSÃO ---
+                    // Se o Ripper Roo estiver perto o suficiente da caixa quando ela explodir
+                    // (distância equivalente ao tamanho de uma plataforma), ele "morre":
+                    // volta para a posição inicial e reinicia a rota de pulos.
+                    glm::vec3 ripper_xyz = ripper_pos;
+                    float ripper_explosion_radius = 5.0f; // Largura de uma plataforma (plat_scale.x * 2)
+                    // Só toma dano se não estiver invulnerável
+                    if (glm::length(ripper_xyz - box_pos) < ripper_explosion_radius && ripper_invulnerability_time <= 0.0f) {
+                        ripper_hp--;
+                        ripper_invulnerability_time = 2.0f; // Fica invulnerável
+                        
+                        ripper_path_index = 0;
+                        ripper_timer = 0.0f;
+                        ripper_pos = platform_positions[ripper_path[0]];
+                        ripper_pos.y = -0.7f;
+
+                        if (ripper_hp <= 0) {
+                            current_state = VICTORY;
+                        }
+                    }
+                }
+
+                // Se a caixa completou a volta e está voltando para o topo da cachoeira (Y alto), reseta!
+                if (active_boxes[i].y > 10.0f) {
+                    caixa_atingida[i] = false;
+                    caixa_destruida[i] = false;
                 }
             }
-        }
 
-        // 4. Comando de Pulo (Só funciona se estiver com o pé firme na pedra)
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && is_grounded) {
-            crash_velocity_y = jump_force;
-            is_grounded = false; // <-- NOVO: Avisa o jogo na mesma hora que ele saiu do chão!
-        }
+            // Adicionamos a "Hitbox" de cada caixa na física do jogo (se não estiver destruída)
+            glm::vec3 tnt_scale = glm::vec3(0.9f, 0.9f, 0.7f); 
+            for (int i = 0; i < 4; i++) {
+                if (!caixa_destruida[i]) {
+                    BoundingBox tnt_box;
+                    tnt_box.min = active_boxes[i] - tnt_scale;
+                    tnt_box.max = active_boxes[i] + tnt_scale;
+                    tnt_box.type = "tnt";
+                    tnt_box.id = i; // Guarda o ID da caixa (0 a 3)
+                    current_frame_collisions.push_back(tnt_box);
+                }
+            }
 
-        // 5. CAIU NA ÁGUA! (Game Over e Respawn)
-        if (crash_position.y < -3.0f) {
-            crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); // Cai do céu no centro
-            crash_velocity_y = 0.0f;
-        }
-        
-        // ------------------------------------------------------------------
-        // ----------------- ATUALIZAÇÃO DO GIRO DO PULO --------------------
-        // ------------------------------------------------------------------
-        if (!is_grounded) 
-        {
-            // Se não está no chão, acumula o giro usando o delta_t lá do início do loop
-            g_CrashJumpSpinAngle += 7.7f * delta_t; 
-        }
-        else
-        {
-            // Se tocou em uma plataforma fixa ou caixa TNT, reseta o ângulo para ficar reto
-            g_CrashJumpSpinAngle = 0.0f;
-        }
-        // ------------------------------------------------------------------
+            // =========================================================================
+            //  Verifica se essa nova posição atravessou alguma plataforma ou caixa
+            // =========================================================================
+            for (BoundingBox& plat : current_frame_collisions) {
+                if (CheckAABBCollision(crash_box.min, crash_box.max, plat.min, plat.max)) {
+                    // Se bateu na plataforma e a velocidade estava puxando para baixo (caindo)...
+                    if (crash_velocity_y <= 0.0f) {
+                        crash_position.y = plat.max.y; // Crava a bota do Crash no topo
+                        crash_velocity_y = 0.0f;       // Zera o impacto da queda
+                        is_grounded = true;
+                        
+                        // Se o chão que ele pisou for uma caixa TNT ativa o cronômetro
+                        if (plat.type == "tnt" && plat.id >= 0) {
+                            if (!caixa_atingida[plat.id]) { 
+                                caixa_atingida[plat.id] = true;
+                                tempo_hit_caixa[plat.id] = current_time;
+                            }
+                        }
+                        break; // Já achou o chão, sai do loop
+                    }
+                }
+            }
 
-       // ------------------------------------------
-        // IA DO RIPPER ROO (VOLTANDO AO PADRÃO DA FÍSICA)
+            // 4. Comando de Pulo (Só funciona se estiver com o pé firme na pedra)
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && is_grounded) {
+                crash_velocity_y = jump_force;
+                is_grounded = false; // <-- NOVO: Avisa o jogo na mesma hora que ele saiu do chão!
+            }
+
+            // 5. CAIU NA ÁGUA! (Subtrai HP e Game Over)
+            if (crash_position.y < -3.0f) {
+                crash_hp--;
+                crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f); // Cai do céu
+                crash_velocity_y = 0.0f;
+                crash_invulnerability_time = 2.0f; // Dá 2 segundos pro jogador respirar
+                
+                if (crash_hp <= 0) {
+                    current_state = GAME_OVER;
+                }
+            }
+            
+            // ------------------------------------------------------------------
+            // ----------------- ATUALIZAÇÃO DO GIRO DO PULO --------------------
+            // ------------------------------------------------------------------
+            if (!is_grounded) 
+            {
+                // Se não está no chão, acumula o giro usando o delta_t lá do início do loop
+                g_CrashJumpSpinAngle += 7.7f * delta_t; 
+            }
+            else
+            {
+                // Se tocou em uma plataforma fixa ou caixa TNT, reseta o ângulo para ficar reto
+                g_CrashJumpSpinAngle = 0.0f;
+            }
+            // ------------------------------------------------------------------
+
         // ------------------------------------------
-        ripper_timer += delta_t;
-        float total_state_time = ripper_jump_duration + ripper_wait_duration;
-        
-        int current_node = ripper_path[ripper_path_index];
-        int next_node = ripper_path[(ripper_path_index + 1) % ripper_path.size()];
-        
-        glm::vec3 start_pos = platform_positions[current_node];
-        glm::vec3 end_pos = platform_positions[next_node];
-        
-        start_pos.y = -0.7f; 
-        end_pos.y = -0.7f;   
-
-        // Cálculo da rotação
-        float dir_x = end_pos.x - start_pos.x;
-        float dir_z = end_pos.z - start_pos.z;
-
-        if (std::abs(dir_x) > 0.01f || std::abs(dir_z) > 0.01f) {
-            ripper_rotation_angle = std::atan2(dir_x, dir_z);
-        }
-        
-        if (ripper_timer <= ripper_wait_duration) {
-            ripper_pos = start_pos;
-        } else if (ripper_timer <= total_state_time) {
-            float jump_progress = (ripper_timer - ripper_wait_duration) / ripper_jump_duration;
+            // IA DO RIPPER ROO (VOLTANDO AO PADRÃO DA FÍSICA)
+            // ------------------------------------------
+            ripper_timer += delta_t;
+            float total_state_time = ripper_jump_duration + ripper_wait_duration;
             
-            ripper_pos.x = glm::mix(start_pos.x, end_pos.x, jump_progress);
-            ripper_pos.z = glm::mix(start_pos.z, end_pos.z, jump_progress);
+            int current_node = ripper_path[ripper_path_index];
+            int next_node = ripper_path[(ripper_path_index + 1) % ripper_path.size()];
             
-            float jump_arc = 1.0f - pow(2.0f * jump_progress - 1.0f, 2.0f);
-            ripper_pos.y = start_pos.y + (jump_arc * 3.0f); 
+            glm::vec3 start_pos = platform_positions[current_node];
+            glm::vec3 end_pos = platform_positions[next_node];
+            
+            start_pos.y = -0.7f; 
+            end_pos.y = -0.7f;   
+
+            // Cálculo da rotação
+            float dir_x = end_pos.x - start_pos.x;
+            float dir_z = end_pos.z - start_pos.z;
+
+            if (std::abs(dir_x) > 0.01f || std::abs(dir_z) > 0.01f) {
+                ripper_rotation_angle = std::atan2(dir_x, dir_z);
+            }
+            
+            if (ripper_timer <= ripper_wait_duration) {
+                ripper_pos = start_pos;
+            } else if (ripper_timer <= total_state_time) {
+                float jump_progress = (ripper_timer - ripper_wait_duration) / ripper_jump_duration;
+                
+                ripper_pos.x = glm::mix(start_pos.x, end_pos.x, jump_progress);
+                ripper_pos.z = glm::mix(start_pos.z, end_pos.z, jump_progress);
+                
+                float jump_arc = 1.0f - pow(2.0f * jump_progress - 1.0f, 2.0f);
+                ripper_pos.y = start_pos.y + (jump_arc * 3.0f); 
+            } else {
+                ripper_timer = 0.0f;
+                ripper_path_index = (ripper_path_index + 1) % ripper_path.size();
+            }
+
+            // ------------------------------------------
+            // COLISÃO: RIPPER ROO MATA O CRASH
+            // ------------------------------------------
+            // Monta a hitbox do Ripper Roo em volta de ripper_pos
+            glm::vec3 ripper_fat = glm::vec3(0.5f, 0.8f, 0.5f);
+            glm::vec3 ripper_box_min = glm::vec3(ripper_pos.x - ripper_fat.x, ripper_pos.y, ripper_pos.z - ripper_fat.z);
+            glm::vec3 ripper_box_max = glm::vec3(ripper_pos.x + ripper_fat.x, ripper_pos.y + ripper_fat.y, ripper_pos.z + ripper_fat.z);
+
+            // Só toma dano se o Crash não estiver no período de imunidade
+            if (crash_invulnerability_time <= 0.0f && CheckAABBCollision(crash_box.min, crash_box.max, ripper_box_min, ripper_box_max)) {
+                crash_hp--;
+                crash_invulnerability_time = 2.0f;
+                
+                crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f);
+                crash_velocity_y = 0.0f;
+
+                if (crash_hp <= 0) {
+                    current_state = GAME_OVER;
+                }
+            }
+
+            // ------------------------------------------
+            // ANIMAÇÃO DO AKU AKU (Curva de Bézier Cúbica)
+            // ------------------------------------------
+            float bezier_speed = 3.0f; 
+            float bezier_t = (sin(current_time * bezier_speed) + 1.0f) / 2.0f; 
+
+            glm::vec3 p0 = glm::vec3(-1.2f,  0.5f,  0.5f);
+            glm::vec3 p1 = glm::vec3(-1.8f,  0.0f, -1.0f);
+            glm::vec3 p2 = glm::vec3( 1.8f,  0.0f, -1.0f);
+            glm::vec3 p3 = glm::vec3( 1.2f,  0.5f,  0.5f);
+
+            glm::vec3 aku_base_pos = glm::vec3(crash_position.x, crash_position.y + 1.6f, crash_position.z);
+            glm::vec3 aku_offset = CalculateBezierCubic(p0, p1, p2, p3, bezier_t);
+            aku_pos = aku_base_pos + aku_offset;
+            // ------------------------------------------
+
+            // =====================================================================
+            // 2. MOVIMENTAÇÃO DO CRASH (WASD)
+            // =====================================================================
+            float crash_speed = 5.0f; 
+
+            // O Crash sempre anda relativo para onde a câmera está olhando no eixo horizontal (chão)
+            glm::vec3 forward_dir = glm::normalize(glm::vec3(camera_look_dir.x, 0.0f, camera_look_dir.z));
+            glm::vec3 right_dir = glm::normalize(glm::cross(forward_dir, glm::vec3(0.0f, 1.0f, 0.0f)));
+
+            // NOVO: Criamos um vetor para acumular a direção do movimento do frame
+            glm::vec3 move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
+
+            // Eixo Z (Frente e Trás)
+            if (g_W_Pressed) {
+                move_direction += forward_dir;
+            }
+            if (g_S_Pressed) {
+                move_direction -= forward_dir;
+            }
+
+            // Eixo X (Esquerda e Direita)
+            if (g_A_Pressed) {
+                move_direction -= right_dir;
+            }
+            if (g_D_Pressed) {
+                move_direction += right_dir;
+            }
+
+            // Se houve algum movimento neste frame, atualizamos a posição e a rotação
+            if (glm::length(move_direction) > 0.0f) {
+                move_direction = glm::normalize(move_direction);
+                
+                // Aplica o movimento na posição do Crash
+                crash_position.x += move_direction.x * crash_speed * delta_t;
+                crash_position.z += move_direction.z * crash_speed * delta_t;
+
+                // CÁLCULO DA ROTAÇÃO: atan2 calcula o ângulo baseado nos eixos X e Z do movimento
+                // Nota: Usamos move_direction.x e move_direction.z para ele girar baseado no mundo e na câmera!
+                crash_rotation_angle = std::atan2(move_direction.x, move_direction.z);
+            }
+            
+        } // FIM IF-PLAYING =====================================================================
+
+        // ==========================================================
+        // RENDERIZAÇÃO E MATRIZES (Roda sempre, independente do estado)
+        // ==========================================================
+        if (g_UseThirdPersonCamera) {
+            // CÂMERA ABERTA (Livre)
+            // A posição só muda se você apertar as setas do teclado!
+            float camera_speed = 5.0f; 
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)    g_CameraPosition += camera_look_dir * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)  g_CameraPosition -= camera_look_dir * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) g_CameraPosition += camera_side_vector * camera_speed * delta_t;
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)  g_CameraPosition -= camera_side_vector * camera_speed * delta_t;
         } else {
-            ripper_timer = 0.0f;
-            ripper_path_index = (ripper_path_index + 1) % ripper_path.size();
+            // PRIMEIRA PESSOA
+            // A câmera é "teleportada" para a cabeça do Crash a cada frame
+            glm::vec4 head_offset = glm::vec4(0.0f, 1.5f, 0.3f, 0.0f); // Altura dos olhos
+            g_CameraPosition = crash_position + head_offset;
         }
 
-        // ------------------------------------------
-        // COLISÃO: RIPPER ROO MATA O CRASH
-        // ------------------------------------------
-        // Monta a hitbox do Ripper Roo em volta de ripper_pos
-        glm::vec3 ripper_fat = glm::vec3(0.5f, 0.8f, 0.5f);
-        glm::vec3 ripper_box_min = glm::vec3(ripper_pos.x - ripper_fat.x, ripper_pos.y, ripper_pos.z - ripper_fat.z);
-        glm::vec3 ripper_box_max = glm::vec3(ripper_pos.x + ripper_fat.x, ripper_pos.y + ripper_fat.y, ripper_pos.z + ripper_fat.z);
+        // Criamos a matriz View
+        glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_look_dir, camera_up_vector);
 
-        // Reaproveita a hitbox do Crash (crash_box) já calculada acima neste mesmo frame
-        if (CheckAABBCollision(crash_box.min, crash_box.max, ripper_box_min, ripper_box_max)) {
-            // O Crash encostou no Ripper Roo: "morre" e respawna no centro
-            crash_position = glm::vec4(0.0f, 3.0f, 0.2f, 1.0f);
-            crash_velocity_y = 0.0f;
-        }
-
-        // ------------------------------------------
-        // ANIMAÇÃO DO AKU AKU (Curva de Bézier Cúbica)
-        // ------------------------------------------
-        float bezier_speed = 3.0f; 
-        float bezier_t = (sin(current_time * bezier_speed) + 1.0f) / 2.0f; 
-
-        glm::vec3 p0 = glm::vec3(-1.2f,  0.5f,  0.5f);
-        glm::vec3 p1 = glm::vec3(-1.8f,  0.0f, -1.0f);
-        glm::vec3 p2 = glm::vec3( 1.8f,  0.0f, -1.0f);
-        glm::vec3 p3 = glm::vec3( 1.2f,  0.5f,  0.5f);
-
-        glm::vec3 aku_base_pos = glm::vec3(crash_position.x, crash_position.y + 1.6f, crash_position.z);
-        glm::vec3 aku_offset = CalculateBezierCubic(p0, p1, p2, p3, bezier_t);
-        glm::vec3 aku_pos = aku_base_pos + aku_offset;
-        // ------------------------------------------
-
+    
         // Aqui executamos as operações de renderização
 
         // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
@@ -854,80 +983,9 @@ int main(int argc, char* argv[])
         glm::vec3 cor_fogo = glm::vec3(1.0f, 0.5f, 0.1f);
         glUniform3fv(u_TorchColor_loc, 1, glm::value_ptr(cor_fogo));
 
-        // =====================================================================
-        // 1. SISTEMA DE CÂMERAS (Aberta/Livre e 1ª Pessoa)
-        // =====================================================================
-        float cam_y = sin(g_CameraPhi);
-        float cam_z = cos(g_CameraPhi) * cos(g_CameraTheta);
-        float cam_x = cos(g_CameraPhi) * sin(g_CameraTheta);
+        
 
-        // Vetor de visão (Para onde o mouse aponta)
-        glm::vec4 camera_look_dir = glm::normalize(glm::vec4(cam_x, cam_y, cam_z, 0.0f)); 
-        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f); 
-
-        // Vetor lateral (Para a câmera poder andar de lado nas setas)
-        glm::vec3 view_3 = glm::vec3(camera_look_dir.x, camera_look_dir.y, camera_look_dir.z);
-        glm::vec4 camera_side_vector = glm::vec4(glm::normalize(glm::cross(view_3, glm::vec3(0.0f, 1.0f, 0.0f))), 0.0f);
-
-        if (g_UseThirdPersonCamera) {
-            // CÂMERA ABERTA (Livre)
-            // A posição só muda se você apertar as setas do teclado!
-            float camera_speed = 5.0f; 
-            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)    g_CameraPosition += camera_look_dir * camera_speed * delta_t;
-            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)  g_CameraPosition -= camera_look_dir * camera_speed * delta_t;
-            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) g_CameraPosition += camera_side_vector * camera_speed * delta_t;
-            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)  g_CameraPosition -= camera_side_vector * camera_speed * delta_t;
-        } else {
-            // PRIMEIRA PESSOA
-            // A câmera é "teleportada" para a cabeça do Crash a cada frame
-            glm::vec4 head_offset = glm::vec4(0.0f, 1.5f, 0.3f, 0.0f); // Altura dos olhos
-            g_CameraPosition = crash_position + head_offset;
-        }
-
-        // Criamos a matriz View
-        glm::mat4 view = Matrix_Camera_View(g_CameraPosition, camera_look_dir, camera_up_vector);
-
-       // =====================================================================
-        // 2. MOVIMENTAÇÃO DO CRASH (WASD)
-        // =====================================================================
-        float crash_speed = 5.0f; 
-
-        // O Crash sempre anda relativo para onde a câmera está olhando no eixo horizontal (chão)
-        glm::vec3 forward_dir = glm::normalize(glm::vec3(camera_look_dir.x, 0.0f, camera_look_dir.z));
-        glm::vec3 right_dir = glm::normalize(glm::cross(forward_dir, glm::vec3(0.0f, 1.0f, 0.0f)));
-
-        // NOVO: Criamos um vetor para acumular a direção do movimento do frame
-        glm::vec3 move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
-
-        // Eixo Z (Frente e Trás)
-        if (g_W_Pressed) {
-            move_direction += forward_dir;
-        }
-        if (g_S_Pressed) {
-            move_direction -= forward_dir;
-        }
-
-        // Eixo X (Esquerda e Direita)
-        if (g_A_Pressed) {
-            move_direction -= right_dir;
-        }
-        if (g_D_Pressed) {
-            move_direction += right_dir;
-        }
-
-        // Se houve algum movimento neste frame, atualizamos a posição e a rotação
-        if (glm::length(move_direction) > 0.0f) {
-            move_direction = glm::normalize(move_direction);
-            
-            // Aplica o movimento na posição do Crash
-            crash_position.x += move_direction.x * crash_speed * delta_t;
-            crash_position.z += move_direction.z * crash_speed * delta_t;
-
-            // CÁLCULO DA ROTAÇÃO: atan2 calcula o ângulo baseado nos eixos X e Z do movimento
-            // Nota: Usamos move_direction.x e move_direction.z para ele girar baseado no mundo e na câmera!
-            crash_rotation_angle = std::atan2(move_direction.x, move_direction.z);
-        }
-        // =====================================================================
+        //=========================================
 
         // Agora computamos a matriz de Projeção.
         glm::mat4 projection;
@@ -981,24 +1039,6 @@ int main(int argc, char* argv[])
 
       
         
-        /*
-
-        // Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
-              * Matrix_Rotate_Z(0.6f)
-              * Matrix_Rotate_X(0.2f)
-              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, SPHERE);
-        DrawVirtualObject("the_sphere");
-
-        // Desenhamos o modelo do coelho
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, BUNNY);
-        DrawVirtualObject("the_bunny");
-        */
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-2.1f,0.0f) 
@@ -1085,8 +1125,14 @@ int main(int argc, char* argv[])
 //-------------------------------------------------------------------------------------------------------------------
 
        // MODELO DO CRASH
+        bool draw_crash = true;
+        if (crash_invulnerability_time > 0.0f) {
+            // Pisca a cada 0.1 segundos usando o módulo do tempo
+            if (fmod(current_time * 10.0f, 2.0f) < 1.0f) draw_crash = false;
+        }
+        
         // Só renderiza o personagem se estivermos na câmera de terceira pessoa!
-        if (g_UseThirdPersonCamera)
+        if (g_UseThirdPersonCamera && draw_crash)
         {
             // Monta a matriz do modelo acumulando as transformações
             model = Matrix_Translate(crash_position.x, crash_position.y, crash_position.z) 
@@ -1297,25 +1343,31 @@ int main(int argc, char* argv[])
         // ------------------------------------------------------------------
         // MODELO DO RIPPER ROO (ORDEM CORRETA DE MATRIZES)
         // ------------------------------------------------------------------
-        float offset_x = 2.7f;  
+        bool draw_ripper = true;
+        if (ripper_invulnerability_time > 0.0f) {
+            if (fmod(current_time * 10.0f, 2.0f) < 1.0f) draw_ripper = false;
+        }
 
-        // 1. Translação para a posição global da IA (onde a plataforma realmente está)
-        model = Matrix_Translate(ripper_pos.x, ripper_pos.y, ripper_pos.z)
-              // 2. Rotação Y para olhar para o alvo
-              * Matrix_Rotate_Y(ripper_rotation_angle)
-              // 3. Ajuste do pivô local (somente no modelo 3D) e escala
-              * Matrix_Translate(offset_x, 0.0f, 0.0f)
-              * Matrix_Scale(0.09f, 0.09f, 0.09f);
+        if (draw_ripper) {
+            float offset_x = 2.7f;  
+            // 1. Translação para a posição global da IA (onde a plataforma realmente está)
+            model = Matrix_Translate(ripper_pos.x, ripper_pos.y, ripper_pos.z)
+                // 2. Rotação Y para olhar para o alvo
+                * Matrix_Rotate_Y(ripper_rotation_angle)
+                // 3. Ajuste do pivô local (somente no modelo 3D) e escala
+                * Matrix_Translate(offset_x, 0.0f, 0.0f)
+                * Matrix_Scale(0.09f, 0.09f, 0.09f);
         
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
 
-        // Corpo do Ripper Roo
-        glUniform1i(g_object_id_uniform, RIPPER_ROO_BODY);
-        DrawVirtualObject("RipperRoo_Colores_0"); 
+            // Corpo do Ripper Roo
+            glUniform1i(g_object_id_uniform, RIPPER_ROO_BODY);
+            DrawVirtualObject("RipperRoo_Colores_0"); 
 
-        // Olhos do Ripper Roo
-        glUniform1i(g_object_id_uniform, RIPPER_ROO_EYES);
-        DrawVirtualObject("RipperRoo_TexOjos_0");
+            // Olhos do Ripper Roo
+            glUniform1i(g_object_id_uniform, RIPPER_ROO_EYES);
+            DrawVirtualObject("RipperRoo_TexOjos_0");
+        }    
         // ------------------------------------------------------------------
 
         // ----------------------------------------------------------------------------------
@@ -1418,6 +1470,30 @@ int main(int argc, char* argv[])
         // por segundo (frames per second).
         TextRendering_ShowFramesPerSecond(window);
 
+        // =====================================================================
+        // RENDERIZAÇÃO DA INTERFACE (HUD)
+        // =====================================================================
+        if (current_state == MENU) {
+            TextRendering_PrintString(window, "CRASH BANDICOOT: RIPPER ROO", -0.5f, 0.2f, 4.0f);
+            TextRendering_PrintString(window, "Pressione ENTER para iniciar", -0.4f, -0.2f, 2.0f);
+        } 
+        else if (current_state == PLAYING) {
+            char hp_buffer[64];
+            snprintf(hp_buffer, sizeof(hp_buffer), "Crash HP: %d", crash_hp);
+            TextRendering_PrintString(window, hp_buffer, -0.9f, 0.9f, 2.0f);
+
+            snprintf(hp_buffer, sizeof(hp_buffer), "Ripper Roo HP: %d", ripper_hp);
+            TextRendering_PrintString(window, hp_buffer, 0.4f, 0.9f, 2.0f);
+        } 
+        else if (current_state == GAME_OVER) {
+            TextRendering_PrintString(window, "GAME OVER", -0.25f, 0.2f, 4.0f);
+            TextRendering_PrintString(window, "Pressione ENTER para tentar novamente", -0.55f, -0.2f, 2.0f);
+        } 
+        else if (current_state == VICTORY) {
+            TextRendering_PrintString(window, "YOU WIN!", -0.2f, 0.2f, 4.0f);
+            TextRendering_PrintString(window, "Pressione ENTER para jogar novamente", -0.55f, -0.2f, 2.0f);
+        }
+        // ------------------------------------------
 
         // Adicione esta linha para printar a posição da câmera e as matrizes na tela:
         //TextRendering_ShowModelViewProjection(window, projection, view, model, g_CameraPosition);
@@ -2292,6 +2368,29 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         LoadShadersFromFiles();
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
+    }
+
+    // Transições de Estado do Jogo (Tecla ENTER)
+    if (key == GLFW_KEY_ENTER && action == GLFW_PRESS) {
+        if (current_state == MENU || current_state == GAME_OVER || current_state == VICTORY) {
+            // Reset das variáveis para o estado inicial
+            crash_hp = 3;
+            ripper_hp = 3;
+            crash_position = glm::vec4(0.0f, -0.8f, 0.0f, 1.0f);
+            crash_velocity_y = 0.0f;
+            
+            ripper_pos = platform_positions[0]; // Volta pro centro
+            ripper_pos.y = -0.7f;
+            ripper_path_index = 0;
+            ripper_timer = 0.0f;
+            
+            for(int i = 0; i < 4; i++) { 
+                caixa_atingida[i] = false; 
+                caixa_destruida[i] = false; 
+            }
+            
+            current_state = PLAYING;
+        }
     }
 }
 
