@@ -25,7 +25,7 @@ Aku-Aku (a mascará) voando em torno do player através de uma **curva de Bézie
 
   O restante foram usadas Cubos simples que foram alterados após transformações geométricas (ex: plataforma, pilar das tochas, etc).
 
-## Contrinuição - Isasc Ventura
+## Contribuição - Isasc Ventura
 
 - Modelagem e posicionamento dos objetos estáticos do cenário como pilares, plataformas, tochas, caixas de TNT (que passaram a se mexer após implementação do Leonardo),
   cachoeira, etc;
@@ -38,7 +38,7 @@ Aku-Aku (a mascará) voando em torno do player através de uma **curva de Bézie
   sobreposição com a câmera);
 - Implementação do Giro ("mortal") do Crash.
 
-## Contrinuição - Leonardo Junqueira
+## Contribuição - Leonardo Junqueira
 
 - XXXXXXXXXXXXXXXXXXXXXX
 
