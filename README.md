@@ -58,19 +58,26 @@ de modo que sugestões relacionadas a posicionamento e colisão, muitas vezes fo
 
 **Tela de menu inicial:**
 
-
+<img width="1919" height="1017" alt="image" src="https://github.com/user-attachments/assets/bb3ac764-8ded-4b97-b1ae-6add56e5094f" />
 
 **Gameplay — Crash no cenário, com HUD de vida e Ripper Roo ao fundo:**
 
+<img width="1920" height="1009" alt="image" src="https://github.com/user-attachments/assets/84f34f5f-bd81-4fc3-9fb9-46f4e30e9522" />
 
 
 **Tela de Vitória:**
 
+<img width="1917" height="1007" alt="image" src="https://github.com/user-attachments/assets/66e9492e-6ef6-44e5-ac9d-cccec5c5287f" />
+
+
 **Tela de Derrota:**
+
+<img width="1918" height="1008" alt="image" src="https://github.com/user-attachments/assets/e725ea2c-69f8-45cc-96bf-f9eb935768a7" />
+
 
 **Câmera em Primeira Pessoa:**
 
-
+<img width="1911" height="1009" alt="image" src="https://github.com/user-attachments/assets/3cb0074d-522f-45f1-ac64-a0c13d02a5c2" />
 
 
 ### Controles
