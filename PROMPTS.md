@@ -10,7 +10,9 @@ Todas implementação de IA está citada aqui, o que não foi citado não foi us
 ## 2 - Atualizacao de cenario, como pilares, agua, texturas, etc. - ISASC
 
   - Uso de IA (Gemini) para descobrir **como fazer um objeto ficar transparente**:
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "COMO SIMULAR ÁGUA? eu quero fazer uma agua estatica mesmo, como se fosse um objeto"
 
   
@@ -38,12 +40,17 @@ Todas implementação de IA está citada aqui, o que não foi citado não foi us
 ## 10 - Ajustes na iluminação das tochas, teto e paredes externas/internas - ISASC
 
   - Uso de IA (Gemini) para **Fontes pontuais de luz nos pilares de Fogo**;
+    
     Enviei um trecho do código e fiz esses PROMPTs:
+    
       "Quero colocar fontes de luz pontuais nos 'FOGO' que estão em cima dos pilares de Tochas",
+    
       "Onde aumento o tamanho da luz? para sobrepor a esfera"
     
   - Uso de IA (Gemini) para **Transformar as esferas em cima do pilar de fogo em vidro fosco colorido**;
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "QUERO TRASFORMAR as esferas em vidro fosco colorido alaranjado como fogo"
     
 
@@ -67,28 +74,41 @@ Todas implementação de IA está citada aqui, o que não foi citado não foi us
 ## 16 - Adiciona mecanica de mortal no pulo, correcao de texturas e novos assets - ISASC
 
   - Uso de IA (Gemini) para **Mecânica de giro enquanto pula**;
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "quero fazer o crash girar quando pula"
 
 ## 17 - Melhorias visuais, Caixas Explosivas agora matam Player e Boss - ISASC
 
   - Uso de IA (Gemini) para **Caixas Sumirem após colisão no topo**;
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "quero que as caixas sumam 3 segundos depois de receber hit no topo"
 
   - Uso de IA (Gemini) para **Morte por explosão**;
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "quero que quando as caixas explosivas desapareçam o crash morra se ele estiver em uma
+    
        plataforma a direita ou a esquerda da caixa"
     
   - Uso de IA (Gemini) para **Direcionamento para onde o Ripper Roo olha enquanto pula**;
+    
     Enviei um trecho do código e fiz um PROMPT:
+    
       "quero que o ripper roo tmbm fique virado em direção a cada pulo dele"
 
   - Uso de IA (Claude) para **Morte do Player ao encostar no Boss**;
+    
     Enviei o arquivo main para a IA e fiz os seguintes PROMPTs:
+    
       "Quero que quando o ripper roo encoste no crash o crash morra",
+    
       "agora quero que ele morra tambem para a explosao da caixa",
+    
       "quero que pegue o ripper por questao de proximidade, uma distancia de uma plataforma"
 
 ## 18 - Aku Aku com curva de Bezier - LEONARDO
