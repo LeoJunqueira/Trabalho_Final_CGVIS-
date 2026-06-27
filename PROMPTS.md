@@ -73,13 +73,15 @@ Todas implementação de IA está citada aqui, o que não foi citado não foi us
 
 ## 16 - Adiciona mecanica de mortal no pulo, correcao de texturas e novos assets - ISASC
 
+  - **- O MESMO COMMIT QUE O PROXIMO, ACABEI DANDO COMMIT DUPLO SEM PERCEBER!**
+
+## 17 - Melhorias visuais, Caixas Explosivas agora matam Player e Boss - ISASC
+
   - Uso de IA (Gemini) para **Mecânica de giro enquanto pula**;
     
     Enviei um trecho do código e fiz um PROMPT:
     
       "quero fazer o crash girar quando pula"
-
-## 17 - Melhorias visuais, Caixas Explosivas agora matam Player e Boss - ISASC
 
   - Uso de IA (Gemini) para **Caixas Sumirem após colisão no topo**;
     
