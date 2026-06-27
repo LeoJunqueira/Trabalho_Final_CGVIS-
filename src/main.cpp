@@ -48,6 +48,7 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+#include "collisions.h"
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -252,24 +253,6 @@ float last_time = 0.0f;     // Para o delta_t
 // ------------------------------------------
 
 // ==========================================
-// MOTOR DE FÍSICA E COLISÃO (AABB)
-// ==========================================
-bool CheckAABBCollision(glm::vec3 minA, glm::vec3 maxA, glm::vec3 minB, glm::vec3 maxB) {
-    // Verifica sobreposição no eixo X
-    bool collisionX = maxA.x >= minB.x && minA.x <= maxB.x;
-    
-    // Verifica sobreposição no eixo Y
-    bool collisionY = maxA.y >= minB.y && minA.y <= maxB.y;
-    
-    // Verifica sobreposição no eixo Z
-    bool collisionZ = maxA.z >= minB.z && minA.z <= maxB.z;
-    
-    // Só há colisão real se estiverem se tocando nos 3 eixos simultaneamente
-    return collisionX && collisionY && collisionZ;
-}
-// ------------------------------------------
-
-// ==========================================
 // MÁQUINA DE ESTADOS E STATUS DOS PERSONAGENS
 // ==========================================
 enum GameState { MENU, PLAYING, GAME_OVER, VICTORY };
@@ -357,6 +340,7 @@ glm::vec3 CalculateBezierCubic(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::ve
 }
 // ------------------------------------------
 
+/*
 // Estrutura para representar os obstáculos invisíveis no mundo
 struct BoundingBox {
     glm::vec3 min;
@@ -364,6 +348,7 @@ struct BoundingBox {
     std::string type; // Ex: "plataforma", "parede", "tnt"
     int id = -1;      // NOVO: Identificador para as caixas específicas
 };
+*/
 
 // Lista de todas as colisões do cenário
 std::vector<BoundingBox> world_collisions;
