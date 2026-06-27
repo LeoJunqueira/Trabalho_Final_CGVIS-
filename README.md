@@ -29,10 +29,9 @@ Aku-Aku (a mascará) voando em torno do player através de uma **curva de Bézie
 
 - Modelagem e posicionamento dos objetos estáticos do cenário como pilares, plataformas, tochas, caixas de TNT (que passaram a se mexer após implementação do Leonardo),
   cachoeira, etc;
-- Implementaço da iluminação das tochas;
-- Correcção de textura do Ripper Roo e aplicaçãon das texturas do Jogo (Exceto as do Crash e Aku-Aku);
+- Implementação da iluminação das tochas;
+- Correcção de textura do Ripper Roo e aplicação das texturas do Jogo (Exceto as do Crash e Aku-Aku);
 - Implementação da colisão entre o Crash e Ripper Roo (incluindo sua "morte" com respawn no centro do cenário);
-- Implementação da colisão entre o Crash e a água (incluindo sua "morte" com respawn no centro do cenário);
 - Lógica de explosão das caixas de TNT, incluindo o dano causado ao Ripper Roo e ao Crash quando próximos da explosão 3 segundos após a colisão;
 - Ajustes como o posicionamento da câmera em primeira e em terceira pessoa, incluindo a remoção do desenho domodelo do Crash durante a primeira pessoa (para evitar
   sobreposição com a câmera);
@@ -40,7 +39,16 @@ Aku-Aku (a mascará) voando em torno do player através de uma **curva de Bézie
 
 ## Contribuição - Leonardo Junqueira
 
-- XXXXXXXXXXXXXXXXXXXXXX
+- Inserção e mapeamento de texturas dos 3 modelos principais: Crash, Aku Aku e Ripper Roo.
+- Implementação da matemática do Sistema de Câmeras em 1ª pessoa.
+- Implementação da movimentação do Crash pelo teclado (WASD).
+- Implementação da gravidade, física de saltos.
+- Desenvolvimento do motor de detecção de colisões AABB, entre o Crash, as plataformas, caixas e a água.
+- Separação do arquivo de de teste de colisão.
+- Implementação da Inteligência Artificial do Ripper Roo utilizando Máquina de Estados e sistema de Waypoints para os saltos.
+- Implementação da animação sincronizada das caixas de TNT flutuando e caindo da cachoeira.
+- Implementação da animação da máscara Aku Aku utilizando Curvas de Bézier Cúbicas.
+- Estruturação do jogo com Máquina de Estados, sistema de vidas, informações na tela e sistema de invulnerabilidade temporal.
 
 
 ## Uso de ferramentas de IA no desenvolvimento (Claude/Gemini)
@@ -95,5 +103,11 @@ de modo que sugestões relacionadas a posicionamento e colisão, muitas vezes fo
 | **O** | Ativa projeção ortográfica |
 | **Esc** | Fecha a aplicação |
 
+### Compilação
 
+Segue os passos de compilação do arquivo COMPILACAO.md:
+
+```bash
+cmake --workflow --preset configure-build-run
+```
 
